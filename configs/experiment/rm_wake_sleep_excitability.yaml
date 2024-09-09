@@ -1,0 +1,105 @@
+# @package _global_
+
+# to execute this experiment run:
+# python main.py experiment=example
+
+defaults:
+  - override /datamodule: mnist
+  - override /algorithm: rm_wake_sleep
+  - override /network: diffusion_layerwise #diffusion_conv
+  - override /trainer: default
+  - override /trainer/callbacks: no_checkpoints
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+seed: 12345
+
+trainer:
+  min_epochs: 400
+  max_epochs: 400 # min_epochs: 10
+  # max_epochs: 10
+  # prints
+  profiler: null
+  # debugs
+  fast_dev_run: False
+  overfit_batches: 0
+  limit_val_batches: 0.
+  limit_test_batches: 1.
+  limit_train_batches: 1.
+  track_grad_norm: -1
+  detect_anomaly: true
+  enable_checkpointing: True
+
+  callbacks:
+    generative_sample:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.GenerativeSamples
+    inf_gen_loss_record:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.InfGenLossRecord
+    mixing_sample:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.MixingSampler
+    closed_eyes:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.ClosedEyes
+    apical_basal_alignment:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.ApicalBasalAlignment
+    distribution_comparisons:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.DistributionComparisons
+    # whitening_quant:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.WhiteningQuant
+    # weight_visualization:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.WeightVisualizations
+    # plasticity_quant:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.PlasticityQuant
+    stimulus_conditioned_variance:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.StimulusConditionedVariance
+    dynamic_mixed_samples:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.DynamicMixedSampler
+algorithm:
+  # lr: 0.00005
+  forward_optimizer:
+    lr: 0.0001
+    weight_decay: 0.
+    betas: [0.9, 0.999]
+  backward_optimizer:
+    lr: 0.001
+    weight_decay: 0.
+    betas: [0.9, 0.999]
+  class_optimizer:
+    lr: 0.001
+    weight_decay: 0
+    betas: [0.9, 0.999]
+  reward_temp: 0.01
+  burn_in_time: 0
+  wake_phase_length: 200
+  sleep_phase_length: 50
+  sleep_phase_number: 100000
+  wake_loss_ratio: 0.99
+  hallucination_mode: 'excitability'
+  # wake_phase_length: 1
+  # sleep_phase_length: 1
+  
+network:
+  # l1_N: 784 #3072
+  # l2_N: 512 #12144
+  # l3_N: 256 #4096
+  # l4_N: 20 #256
+  layer_widths:  [512, 256, 256, 128, 64, 32, 16] # [512, 256, 16] #
+  # l_N: 40
+  # kernel_size: 21
+  # recurrent_kernel_size: 5
+  # diffusion_steps: 1
+  # beta: 0.01
+  beta: 0.01
+  input_shape:  [1, 28, 28]
+  sigma_inf: 0.01
+  sigma_gen: 0.01
+  batch_size: 512
+  n_classes: 10
+
+datamodule:
+  batch_size: 512
+  normalize: True
+  # version: "2021_train_mini"
+  drop_last: True #this is necessary for wake-sleep generative models for now
+  
+name: "${hydra:runtime.choices.algorithm}-${hydra:runtime.choices.network}-${hydra:runtime.choices.datamodule}"

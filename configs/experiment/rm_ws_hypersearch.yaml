@@ -1,0 +1,132 @@
+# @package _global_
+
+defaults:
+  - override /datamodule: cifar10
+  - override /algorithm: rm_wake_sleep
+  - override /network: masked_fcwsmodel
+  - override /trainer: default
+  - override /trainer/callbacks: rich_progress_bar
+  - override /hydra/sweeper: orion
+  - override /hydra/launcher: submitit_slurm
+
+name: rm_ws_hypersearch
+
+trainer:
+  accelerator: gpu
+  devices: 1
+  min_epochs: 50
+  max_epochs: 50
+  # prints
+  profiler: null
+  # debugs
+  fast_dev_run: False
+  overfit_batches: 0
+  limit_val_batches: 0.
+  limit_test_batches: 1.
+  limit_train_batches: 1.
+  track_grad_norm: -1
+  detect_anomaly: true
+  enable_checkpointing: True
+
+  callbacks:
+    generative_sample:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.GenerativeSamples
+    inf_gen_loss_record:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.InfGenLossRecord
+    mixing_sample:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.MixingSampler
+    closed_eyes:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.ClosedEyes
+    # apical_basal_alignment:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.ApicalBasalAlignment
+    distribution_comparisons:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.DistributionComparisons
+    whitening_quant:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.WhiteningQuant
+    # weight_visualization:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.WeightVisualizations
+    # plasticity_quant:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.PlasticityQuant
+    # stimulus_conditioned_variance:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.StimulusConditionedVariance
+
+algorithm:
+  lr: 0.0001
+  forward_optimizer:
+    weight_decay: 0.
+    betas: [0.9, 0.999]
+  backward_optimizer:
+    weight_decay: 0.
+    betas: [0.9, 0.999]
+  reward_temp: 0.01
+  burn_in_time: 0
+  wake_phase_length: 200
+  sleep_phase_length: 200
+  
+network:
+  # l1_N: 784 #3072
+  # l2_N: 512 #12144
+  # l3_N: 256 #4096
+  # l4_N: 20 #256
+  layer_widths: [784, 1024, 512, 256]
+  l_N: 20
+  input_shape:  [3, 32, 32]
+  sigma_inf: 0.01
+  sigma_gen: 0.01
+  batch_size: 128
+
+datamodule:
+  batch_size: 128
+  normalize: True
+  # version: "2021_train_mini"
+  drop_last: True #this is necessary for wake-sleep generative models for now
+
+hydra:
+  mode: MULTIRUN
+  launcher:
+    cpus_per_task: 2
+    nodes: 1
+    # TODO: Pack more than one job on a single GPU.
+    tasks_per_node: 1
+    mem_gb: 16
+    array_parallelism: 16  # max num of jobs to run in parallel
+    gres: gpu:1
+    # Other things to pass to `sbatch`:
+    additional_parameters:
+      time: 0-20:00:00  # maximum wall time allocated for the job (D-HH:MM:SS)
+
+    ## A list of commands to add to the generated sbatch script before running srun:
+    setup:
+    - unset CUDA_VISIBLE_DEVICES
+
+  sweeper:
+    params:
+      algorithm:
+        forward_optimizer:
+          lr: "choices([1e-4, 5e-5, 1e-5, 5e-6, 1e-6])"
+      # network:
+      #   l4_N: "choices([2,4,6,8,10])"
+
+
+    orion:
+      name: "${name}"
+      version: 1
+
+    algorithm:
+    #  BUG: Getting a weird bug with TPE: KeyError in `dum_below_trials = [...]` at line 397.
+      type: gridsearch
+      config:
+        n_values: 5
+
+    worker:
+      n_workers: 16
+      max_broken: 3
+      max_trials: 200
+
+    storage:
+      type: legacy
+      database:
+          type: pickleddb
+          host: "${oc.env:SCRATCH}/logs/${name}/multiruns/database.pkl"
+
+seed: 123

@@ -1,0 +1,71 @@
+# @package _global_
+
+# to execute this experiment run:
+# python main.py experiment=example
+
+defaults:
+  - override /datamodule: inaturalist
+  - override /algorithm: rm_wake_sleep
+  - override /network: rmwsmodel
+  - override /trainer: default
+  - override /trainer/callbacks: no_checkpoints
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+seed: 12345
+
+trainer:
+  min_epochs: 10
+  max_epochs: 10
+  # prints
+  profiler: null
+  # debugs
+  fast_dev_run: False
+  overfit_batches: 0
+  limit_val_batches: 0.
+  limit_test_batches: 1.
+  limit_train_batches: 1.
+  track_grad_norm: -1
+  detect_anomaly: true
+  enable_checkpointing: True
+
+  callbacks:
+    generative_sample:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.GenerativeSamples
+    inf_gen_loss_record:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.InfGenLossRecord
+    mixing_sample:
+      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.MixingSampler
+    # distribution_comparisons:
+    #   _target_: beyond_backprop.algorithms.wake_sleep.callbacks.DistributionComparisons
+#    weight_visualization:
+#      _target_: beyond_backprop.algorithms.wake_sleep.callbacks.WeightVisualizations
+algorithm:
+  forward_optimizer:
+    lr: 0.00001
+    weight_decay: 0.0
+  backward_optimizer:
+    lr: 0.00001
+    weight_decay: 0.0
+  reward_temp: 0.01
+  burn_in_time: 0
+  wake_phase_length: 200
+  sleep_phase_length: 200
+  
+network:
+  l1_N: 150528 #3072
+  l2_N: 3036 #12144
+  l3_N: 1024 #4096
+  l4_N: 256 #256
+  sigma_inf: 0.01
+  sigma_gen: 0.01
+  batch_size: 128
+
+datamodule:
+  batch_size: 128
+  normalize: True
+  version: "2021_train_mini"
+  drop_last: True #this is necessary for wake-sleep generative models for now
+  
+name: "${hydra:runtime.choices.algorithm}-${hydra:runtime.choices.network}-${hydra:runtime.choices.datamodule}"

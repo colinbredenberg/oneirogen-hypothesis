@@ -1,0 +1,43 @@
+# @package _global_
+
+# to execute this experiment run:
+# python main.py experiment=example
+
+defaults:
+  - override /datamodule: mnist
+  - override /algorithm: feedback_alignment
+  - override /network: famodel
+  - override /trainer: cpu
+  - override /trainer/callbacks: no_checkpoints
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+seed: 12345
+
+trainer:
+  min_epochs: 20
+  max_epochs: 20
+  # prints
+  profiler: null
+  # debugs
+  fast_dev_run: False
+  overfit_batches: 0
+  limit_val_batches: 0.
+  limit_test_batches: 1.0
+  limit_train_batches: 1.0
+  track_grad_norm: -1
+  detect_anomaly: true
+  enable_checkpointing: false
+
+algorithm:
+  optimizer:
+    lr: 0.001
+
+network:
+  middle_layer_width: 50
+
+datamodule:
+  batch_size: 128
+
+name: "${hydra:runtime.choices.algorithm}-${hydra:runtime.choices.network}-${hydra:runtime.choices.datamodule}"

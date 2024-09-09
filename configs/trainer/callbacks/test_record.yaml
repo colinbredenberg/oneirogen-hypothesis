@@ -1,0 +1,3 @@
+# Record a pandas array of desired network attributes at the end of a test simulation.
+test_record:
+  _target_: beyond_backprop.algorithms.reinforce.callbacks.TestRecord

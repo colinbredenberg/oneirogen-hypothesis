@@ -1,0 +1,16 @@
+# @package _global_
+# These are the default values for the algorithm hyper-parameters when using the DTP algorithm with
+# the LeNet architecture on the CIFAR10 dataset.
+algorithm:
+  # NOTE: These were supposedly our best values for DTP/lenet/cifar10. Using them by default on all the datasets.
+  feedback_training_iterations: [41, 51, 24]
+  batch_size: 256
+  noise: [0.41640228838517584, 0.3826261146623929, 0.1395382069358601]
+  beta: 0.4655
+  b_optim:
+    lr: [0.0007188427494432325, 0.00012510321884615596, 0.03541466958291287]
+    momentum: 0.9
+  f_optim:
+    lr: 0.03618
+    weight_decay: 0.0001
+    momentum: 0.9

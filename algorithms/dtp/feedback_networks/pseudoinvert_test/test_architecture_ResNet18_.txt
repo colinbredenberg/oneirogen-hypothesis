@@ -1,0 +1,172 @@
+forward net:
+ResNet18(
+  (layer_0): Sequential(
+    (conv): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+    (bn): Identity()
+    (rho): ReLU()
+  )
+  (layer_1): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+  )
+  (layer_2): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(64, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential(
+        (conv): Conv2d(64, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): Identity()
+      )
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+  )
+  (layer_3): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential(
+        (conv): Conv2d(128, 256, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): Identity()
+      )
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+  )
+  (layer_4): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(256, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential(
+        (conv): Conv2d(256, 512, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (bn): Identity()
+      )
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+  )
+  (fc): Sequential(
+    (pool): AdaptiveAvgPool2d(output_size=(1, 1))
+    (reshape): Reshape((torch.Size([512, 1, 1]) -> torch.Size([512])))
+    (linear): Linear(in_features=512, out_features=10, bias=True)
+  )
+)
+feedback net:
+Sequential(
+  (fc): Sequential(
+    (linear): Linear(in_features=10, out_features=512, bias=True)
+    (reshape): Reshape((torch.Size([512]) -> (512, 1, 1)))
+    (pool): AdaptiveAvgPool2d(output_size=torch.Size([4, 4]))
+  )
+  (layer_4): Sequential(
+    (1): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+    (0): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(512, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), output_padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential(
+        (bn): Identity()
+        (conv): ConvTranspose2d(512, 256, kernel_size=(1, 1), stride=(2, 2), output_padding=(1, 1), bias=False)
+      )
+    )
+  )
+  (layer_3): Sequential(
+    (1): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+    (0): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(256, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), output_padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential(
+        (bn): Identity()
+        (conv): ConvTranspose2d(256, 128, kernel_size=(1, 1), stride=(2, 2), output_padding=(1, 1), bias=False)
+      )
+    )
+  )
+  (layer_2): Sequential(
+    (1): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+    (0): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(128, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), output_padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential(
+        (bn): Identity()
+        (conv): ConvTranspose2d(128, 64, kernel_size=(1, 1), stride=(2, 2), output_padding=(1, 1), bias=False)
+      )
+    )
+  )
+  (layer_1): Sequential(
+    (1): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+    (0): InvertedBasicBlock(
+      (conv1): ConvTranspose2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): Identity()
+      (conv2): ConvTranspose2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn2): Identity()
+      (shortcut): Sequential()
+    )
+  )
+  (layer_0): Sequential(
+    (rho): ReLU()
+    (bn): Identity()
+    (conv): ConvTranspose2d(64, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  )
+)

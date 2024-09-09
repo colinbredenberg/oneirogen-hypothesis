@@ -1,0 +1,10 @@
+# @package _global_
+# This is the default behaviour when using the DTP algorithm with the Resnet18 architecture.
+# TODO: Tune these hyper-parameters for each dataset of interest, and create a dedicated file in
+# the algorithm_network_datamodule folder.
+# TODO: These here were copied from simple_vgg, doesn't really make sense imo.
+algorithm:
+  feedback_training_iterations: [20, 30, 35, 55, 20]
+  noise: [0.4, 0.4, 0.2, 0.2, 0.08]
+  b_optim:
+    lr: [0.0001, 3.5e-4, 0.008, 0.008, 0.18]

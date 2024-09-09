@@ -1,6 +1,10 @@
-# WIP: Codebase for biologically-inspired learning algorithms (alternatives to backprop)
+# Codebase for the paper: "The oneirogen hypothesis: modeling the hallucinatory effects of classical psychedelics in terms of replay-dependent plasticity mechanisms"
+By Colin Bredenberg, Fabrice Normandin, Blake Richards, and Guillaume Lajoie
 
-Inspired / adapted from https://www.github.com/ernoult/ScalingDTP as well as https://github.com/ashleve/lightning-hydra-template
+
+This code repository was reproduced by simplifying and adapting the Mila IDT teams BeyondBackprop library: https://github.com/mila-iqia/BeyondBackprop (still under active development)
+
+Also inspired / adapted from https://www.github.com/ernoult/ScalingDTP as well as https://github.com/ashleve/lightning-hydra-template
 
 ## Installation
 
@@ -63,4 +67,20 @@ You can additionally use pre-commit for auto-formatting and linting if you want:
 
 ```console
 pre-commit install
+```
+
+To rerun the experiments used to produce the main paper figures, choose an experiment in the ```beyond_backprop/configs/experiment``` folder and run:
+
+``` python main.py experiment=[experiment_name]
+```
+
+Expected runtime: 2-3 hours. Generating full hallucination videos may take longer, but experiment results will appear in your ```beyond_backprop/logs/``` folder before then.
+
+If you do not have a gpu on your local machine, you may need to change the line:
+
+``` - override /trainer: default
+```
+in the config file you would like to run to:
+
+``` - override /trainer: cpu
 ```

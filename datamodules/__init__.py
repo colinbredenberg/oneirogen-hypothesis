@@ -1,0 +1,6 @@
+from .cifar10_datamodule import CIFAR10DataModule, cifar10_normalization
+from .fashion_mnist_datamodule import FashionMNISTDataModule
+from .image_classification import ImageClassificationDataModule
+from .imagenet32 import ImageNet32DataModule, imagenet32_normalization
+from .mnist_datamodule import MNISTDataModule
+from .vision_datamodule import VisionDataModule

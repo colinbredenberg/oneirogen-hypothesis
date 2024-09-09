@@ -53,16 +53,19 @@ python main.py algorithm=backprop datamodule=mnist trainer.max_epochs=10
 
 To rerun the experiments used to produce the main paper figures, choose an experiment in the ```beyond_backprop/configs/experiment``` folder and run:
 
-```python main.py experiment=[experiment_name]
+```console
+python main.py experiment=[experiment_name]
 ```
 
 Expected runtime: 2-3 hours. Generating full hallucination videos may take longer, but experiment results will appear in your ```beyond_backprop/logs/``` folder before then.
 
 If you do not have a gpu on your local machine, you may need to change the line:
 
-```- override /trainer: default
+```console
+- override /trainer: default
 ```
 in the config file you would like to run to:
 
-```- override /trainer: cpu
+```console
+- override /trainer: cpu
 ```

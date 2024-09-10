@@ -36,7 +36,6 @@ from beyond_backprop.algorithms.image_classification import ImageClassificationA
 
 from ..algorithm import Algorithm, PhaseStr, StepOutputDict
 import beyond_backprop.algorithms.common.layer as layer
-from beyond_backprop.algorithms.common.layered_network import LayeredNetwork
 from .inf_gen_network import InfGenNetwork
 
 import networkx as nx

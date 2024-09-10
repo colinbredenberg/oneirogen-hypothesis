@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-import logging
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, TypeVar
+from dataclasses import dataclass
+from typing import TypeVar
 import networkx as nx
 
 import torch
-import wandb
-from hydra.utils import HydraConfig
+
 from hydra_zen import instantiate
 from torch import Tensor, nn
 from torch.nn import functional as F
-from torch.optim.optimizer import Optimizer
 
-from lightning import Callback, LightningModule, Trainer
+
+from lightning import Callback
 
 from beyond_backprop.configs.lr_scheduler import CosineAnnealingLRConfig
 from beyond_backprop.configs.optimizer import SGDConfig
@@ -22,19 +19,14 @@ from beyond_backprop.configs.optimizer import AdamConfig
 from beyond_backprop.datamodules.image_classification import (
     ImageClassificationDataModule,
 )
-from beyond_backprop.networks.conv_architecture import (
-    get_all_forward_activations_and_indices,
-)
-from beyond_backprop.networks.invertible import set_input_output_shapes_on_forward
+
 from beyond_backprop.networks.layers import Sequential
 from beyond_backprop.networks.lenet import LeNet
 from beyond_backprop.networks.resnet import ResNet18, ResNet34
 from beyond_backprop.networks.simple_vgg import SimpleVGG
-from beyond_backprop.utils.hydra_utils import Partial, add_attributes
-from beyond_backprop.utils.utils import is_trainable
 from beyond_backprop.algorithms.image_classification import ImageClassificationAlgorithm
 
-from ..algorithm import Algorithm, PhaseStr, StepOutputDict
+from ..algorithm import PhaseStr, StepOutputDict
 import beyond_backprop.algorithms.common.layer as layer
 from .inf_gen_network import InfGenNetwork
 

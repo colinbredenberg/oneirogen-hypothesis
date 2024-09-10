@@ -61,7 +61,7 @@ class InfGenNetwork(nn.Module):
             self.gen_graph = kwargs["graphs"][1]
 
             assert set(self.graph.nodes) == set(self.gen_graph.nodes)
-            assert all(isinstance(node, layer.InfGenProbabilityLayer) or isinstance(node, TemporalPlaceHolder) for node in self.graph.nodes)
+            assert all(isinstance(node, layer.InfGenProbabilityLayer) for node in self.graph.nodes)
         else:
             self.graph = nx.DiGraph()
             self.gen_graph = nx.DiGraph()
@@ -79,7 +79,7 @@ class InfGenNetwork(nn.Module):
             self.temporal = True
 
             assert set(self.t0_graph.nodes) == set(self.gen_t0_graph.nodes)
-            assert all(isinstance(node, layer.InfGenProbabilityLayer) or isinstance(node, TemporalPlaceHolder)  for node in self.t0_graph.nodes)
+            assert all(isinstance(node, layer.InfGenProbabilityLayer)  for node in self.t0_graph.nodes)
         else:
             self.time_graph = nx.DiGraph()
             self.gen_time_graph = nx.DiGraph()
@@ -161,16 +161,13 @@ class InfGenNetwork(nn.Module):
             graph = self.graph
         for count, layer in enumerate(ts):
             input_list = []
-            if isinstance(layer, TemporalPlaceHolder):
-                pass
-            else:
-                input_list += [parent.output for parent in graph.predecessors(layer)] #if at any intermediate layer, feed in the outputs of any parent layers
-                # if not (len(self.time_graph.nodes)==0):
-                #     input_list += [parent.prev_output for parent in self.time_graph.predecessors(layer)]
-                if layer.input_layer: #child nodes receive the inputs to the network
-                    input_list += [*x]
-                
-                layer.forward(input_list, gen = False)
+            input_list += [parent.output for parent in graph.predecessors(layer)] #if at any intermediate layer, feed in the outputs of any parent layers
+            # if not (len(self.time_graph.nodes)==0):
+            #     input_list += [parent.prev_output for parent in self.time_graph.predecessors(layer)]
+            if layer.input_layer: #child nodes receive the inputs to the network
+                input_list += [*x]
+            
+            layer.forward(input_list, gen = False)
             
     def gen_forward(self, subgraph: DiGraph | None = None):
         #generate samples from the network
@@ -188,17 +185,14 @@ class InfGenNetwork(nn.Module):
                 graph = self.gen_graph
         for count, layer in enumerate(ts):
             input_list = []
-            if isinstance(layer, TemporalPlaceHolder):
-                pass
+            if list(graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
+                input_list += [torch.tensor([float('nan')])]
             else:
-                if list(graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
-                    input_list += [torch.tensor([float('nan')])]
-                else:
-                    input_list += [parent.gen_output for parent in graph.predecessors(layer)]
-                    # if not (len(self.gen_time_graph.nodes)==0 or self.t0):
-                    #     input_list += [parent.prev_gen_output for parent in self.gen_time_graph.predecessors(layer)]
-                
-                layer.forward(input_list, gen = True)
+                input_list += [parent.gen_output for parent in graph.predecessors(layer)]
+                # if not (len(self.gen_time_graph.nodes)==0 or self.t0):
+                #     input_list += [parent.prev_gen_output for parent in self.gen_time_graph.predecessors(layer)]
+            
+            layer.forward(input_list, gen = True)
 
     def mixed_forward(self, x: Tensor, mixing_constant: float, pyramid = False):
         #sets self.output for each layer as the stimulus-driven output
@@ -213,19 +207,16 @@ class InfGenNetwork(nn.Module):
             graph = self.gen_graph
         for count, layer in enumerate(ts):
             input_list = []
-            if isinstance(layer, TemporalPlaceHolder):
-                pass
+            if list(graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
+                input_list += [torch.tensor([float('nan')])]
             else:
-                if list(graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
-                    input_list += [torch.tensor([float('nan')])]
-                else:
-                    input_list += [parent.mixed_output for parent in graph.predecessors(layer)]
-                    # if not (len(time_graph.nodes)==0) and not(self.t0):
-                    #     input_list += [parent.prev_mixed_output for parent in time_graph.predecessors(layer)]
-                if pyramid and count == 0:
-                    layer.mixed_forward(input_list, 0.)
-                else:
-                    layer.mixed_forward(input_list, mixing_constant)
+                input_list += [parent.mixed_output for parent in graph.predecessors(layer)]
+                # if not (len(time_graph.nodes)==0) and not(self.t0):
+                #     input_list += [parent.prev_mixed_output for parent in time_graph.predecessors(layer)]
+            if pyramid and count == 0:
+                layer.mixed_forward(input_list, 0.)
+            else:
+                layer.mixed_forward(input_list, mixing_constant)
 
     def dynamic_mixed_forward(self, x: Tensor, T: int, mixing_constant: float, timescale: float, idxs: list[int], lesion_idxs: list[int] =[], apical_lesion_idxs: list[int] = [], mode = 'interp'):
         self.eval()
@@ -254,26 +245,23 @@ class InfGenNetwork(nn.Module):
                 for count, layer in enumerate(gen_ts):
                     input_list_gen = []
                     input_list = []
-                    if isinstance(layer, TemporalPlaceHolder):
-                        pass
+                    if list(gen_graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
+                        input_list_gen += [torch.tensor([float('nan')])]
                     else:
-                        if list(gen_graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
-                            input_list_gen += [torch.tensor([float('nan')])]
+                        input_list_gen += [parent.dynamic_mixed_output_prev for parent in gen_graph.predecessors(layer)]
+                    
+                    input_list += [parent.dynamic_mixed_output_prev for parent in graph.predecessors(layer)] #if at any intermediate layer, feed in the outputs of any parent layers
+                    if layer.input_layer: #child nodes receive the inputs to the network
+                        input_list += [*x]
+                    if count in apical_lesion_idxs:
+                        layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, geometric_mean = False, apical_lesion = True, mode = mode)
+                    else:
+                        layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, geometric_mean = False, apical_lesion = False, mode = mode)
+                    if count in lesion_idxs:
+                        if torch.cuda.is_available():
+                            layer.dynamic_mixed_output = torch.zeros(layer.dynamic_mixed_output.shape).to(torch.cuda.current_device())
                         else:
-                            input_list_gen += [parent.dynamic_mixed_output_prev for parent in gen_graph.predecessors(layer)]
-                        
-                        input_list += [parent.dynamic_mixed_output_prev for parent in graph.predecessors(layer)] #if at any intermediate layer, feed in the outputs of any parent layers
-                        if layer.input_layer: #child nodes receive the inputs to the network
-                            input_list += [*x]
-                        if count in apical_lesion_idxs:
-                            layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, geometric_mean = False, apical_lesion = True, mode = mode)
-                        else:
-                            layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, geometric_mean = False, apical_lesion = False, mode = mode)
-                        if count in lesion_idxs:
-                            if torch.cuda.is_available():
-                                layer.dynamic_mixed_output = torch.zeros(layer.dynamic_mixed_output.shape).to(torch.cuda.current_device())
-                            else:
-                                layer.dynamic_mixed_output = torch.zeros(layer.dynamic_mixed_output.shape)
+                            layer.dynamic_mixed_output = torch.zeros(layer.dynamic_mixed_output.shape)
                 for count, idx in enumerate(idxs):  
                     record[count][tt,...] = self.ts[idx].dynamic_mixed_output
         self.train()
@@ -301,25 +289,22 @@ class InfGenNetwork(nn.Module):
         log_prob = 0
         for count, layer in enumerate(ts):
             input_list = []
-            if isinstance(layer, TemporalPlaceHolder):
-                pass
+            if layer.input_layer: #the first inference layers have no parameters to be evaluated, and p(s) from the environment is unknown
+                input_list = []
             else:
-                if layer.input_layer: #the first inference layers have no parameters to be evaluated, and p(s) from the environment is unknown
-                    input_list = []
+                if mixed_output:
+                    input_list += [parent.dynamic_mixed_output.detach() for parent in graph.predecessors(layer)]
+                    # if not (len(self.time_graph.nodes)==0):
+                    #     input_list += [parent.prev_mixed_output.detach() for parent in self.time_graph.predecessors(layer)]
                 else:
-                    if mixed_output:
-                        input_list += [parent.dynamic_mixed_output.detach() for parent in graph.predecessors(layer)]
-                        # if not (len(self.time_graph.nodes)==0):
-                        #     input_list += [parent.prev_mixed_output.detach() for parent in self.time_graph.predecessors(layer)]
-                    else:
-                        input_list = [parent.gen_output.detach() for parent in graph.predecessors(layer)]
-                        # if not (len(self.gen_time_graph.nodes)==0) and not(self.t0):
-                        #     input_list += [parent.prev_gen_output.detach() for parent in self.gen_time_graph.predecessors(layer)]
-                    layer_log_prob = layer.log_prob(x = input_list, output = layer.gen_output.detach())
-                    log_prob += layer_log_prob#.sum(dim = list(range(1, layer_log_prob.dim())))
-                    if not(count == len(ts)-1):
-                        l1_reg = regularizer * torch.abs(layer.predicted_activity_inf[0])#/layer.predicted_activity_inf[1]**2
-                        log_prob -= torch.sum(l1_reg, dim = list(range(1,l1_reg.dim())))
+                    input_list = [parent.gen_output.detach() for parent in graph.predecessors(layer)]
+                    # if not (len(self.gen_time_graph.nodes)==0) and not(self.t0):
+                    #     input_list += [parent.prev_gen_output.detach() for parent in self.gen_time_graph.predecessors(layer)]
+                layer_log_prob = layer.log_prob(x = input_list, output = layer.gen_output.detach())
+                log_prob += layer_log_prob#.sum(dim = list(range(1, layer_log_prob.dim())))
+                if not(count == len(ts)-1):
+                    l1_reg = regularizer * torch.abs(layer.predicted_activity_inf[0])#/layer.predicted_activity_inf[1]**2
+                    log_prob -= torch.sum(l1_reg, dim = list(range(1,l1_reg.dim())))
         
         self.t0 = False
         return log_prob
@@ -343,30 +328,27 @@ class InfGenNetwork(nn.Module):
 
         log_prob = 0
         for count, layer in enumerate(ts):
-            if isinstance(layer, TemporalPlaceHolder):
-                pass
+            if list(graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
+                input_list = [torch.tensor([float('nan')])]
             else:
-                if list(graph.predecessors(layer)) == [] and (self.t0 or not(self.temporal)):
-                    input_list = [torch.tensor([float('nan')])]
+                if mixed_output:
+                    input_list = [parent.dynamic_mixed_output.detach() for parent in graph.predecessors(layer)]
+                    # if not (len(self.time_graph.nodes)==0):
+                    #     input_list += [parent.prev_mixed_output.detach() for parent in self.time_graph.predecessors(layer)]
                 else:
-                    if mixed_output:
-                        input_list = [parent.dynamic_mixed_output.detach() for parent in graph.predecessors(layer)]
-                        # if not (len(self.time_graph.nodes)==0):
-                        #     input_list += [parent.prev_mixed_output.detach() for parent in self.time_graph.predecessors(layer)]
+                    if not(differentiable): #if differentiable, allow gradients to flow through the network output
+                        input_list = [parent.output.detach() for parent in graph.predecessors(layer)]
                     else:
-                        if not(differentiable): #if differentiable, allow gradients to flow through the network output
-                            input_list = [parent.output.detach() for parent in graph.predecessors(layer)]
-                        else:
-                            input_list = [parent.output for parent in graph.predecessors(layer)]
-                        # if not (len(self.time_graph.nodes)==0):
-                        #     input_list += [parent.prev_output for parent in self.time_graph.predecessors(layer)]
-                layer_log_prob = layer.log_prob(x = input_list, output = layer.output.detach(), gen = True)
-                if layer_log_prob.dim() > 1:
-                    layer_log_prob = layer_log_prob.sum(dim = list(range(1, layer_log_prob.dim()))) #sum over non-batch dimensions
-                log_prob += layer_log_prob
-                if not(count == 0) and not(count == len(ts) -1 ):
-                    l1_reg = regularizer * torch.abs(layer.predicted_activity_gen[0])#/layer.predicted_activity_gen[1]**2
-                    log_prob -= torch.sum(l1_reg, dim = list(range(1,l1_reg.dim())))
+                        input_list = [parent.output for parent in graph.predecessors(layer)]
+                    # if not (len(self.time_graph.nodes)==0):
+                    #     input_list += [parent.prev_output for parent in self.time_graph.predecessors(layer)]
+            layer_log_prob = layer.log_prob(x = input_list, output = layer.output.detach(), gen = True)
+            if layer_log_prob.dim() > 1:
+                layer_log_prob = layer_log_prob.sum(dim = list(range(1, layer_log_prob.dim()))) #sum over non-batch dimensions
+            log_prob += layer_log_prob
+            if not(count == 0) and not(count == len(ts) -1 ):
+                l1_reg = regularizer * torch.abs(layer.predicted_activity_gen[0])#/layer.predicted_activity_gen[1]**2
+                log_prob -= torch.sum(l1_reg, dim = list(range(1,l1_reg.dim())))
         
         self.t0 = False
         return log_prob
@@ -383,25 +365,3 @@ class InfGenNetwork(nn.Module):
         for l, l_prev in self.time_assoc:
             if (self.t0 and l.is_t0_layer) or (not(self.t0) and l.is_transition_layer):
                 l_prev.set_output(l.get_output(mixed = mixed, gen = gen), mixed = mixed, gen = gen)
-        
-class TemporalPlaceHolder():
-    """Generic placeholder class for storing information about previous timesteps"""
-    def __init__(self, shape):
-        self.shape = shape
-        self.output = torch.zeros(self.shape)
-        self.mixed_output = torch.zeros(self.shape)
-        self.gen_output = torch.zeros(self.shape)
-
-    def set_output(self, output, mixed = False, gen = False):
-        if mixed:
-            self.mixed_output = output
-        elif gen:
-            self.gen_output = output
-        else:
-            self.output = output
-
-    def reset(self):
-        self.output = torch.zeros(self.shape)
-        self.mixed_output = torch.zeros(self.shape)
-        self.gen_output = torch.zeros(self.shape)
-    

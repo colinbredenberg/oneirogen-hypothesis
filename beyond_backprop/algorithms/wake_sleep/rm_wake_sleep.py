@@ -203,11 +203,7 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
         return backward_optim, forward_optim, class_optim
 
     def configure_callbacks(self) -> list[Callback]:
-        # NOTE: Can actually reuse this:
-        from beyond_backprop.algorithms.reinforce.callbacks import TestRecord
-        # from beyond_backprop.algorithms.example_target_prop.callbacks import DetectIfTrainingCollapsed
         return super().configure_callbacks() + [
-            # DetectIfTrainingCollapsed(),
         ]
 
     def check_network(self, net: nn.Module):

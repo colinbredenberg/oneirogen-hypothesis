@@ -9,7 +9,6 @@ from hydra.core.config_store import ConfigStore
 from hydra_zen import hydrated_dataclass, instantiate
 from torch import Tensor
 from torchvision import transforms
-from beyond_backprop.algorithms.rl_example.rl_datamodule import RlDataModule
 
 from beyond_backprop.datamodules import (
     CIFAR10DataModule,

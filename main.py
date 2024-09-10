@@ -9,7 +9,6 @@ from lightning import LightningDataModule
 import rich
 import wandb
 from omegaconf import DictConfig, OmegaConf
-from beyond_backprop.algorithms.rl_example.rl_datamodule import RlDataModule
 
 from beyond_backprop.configs.config import Config
 from beyond_backprop.experiment import Experiment, setup_experiment
@@ -119,24 +118,12 @@ def evaluation(experiment: Experiment) -> tuple[float | None, dict]:
 
     loss = results_dict.pop(f"{results_type}/loss")
     # rich.print(f"{results_type} loss: {loss:.2f}")
-    if isinstance(experiment.datamodule, RlDataModule):
-        # NOTE: Reinforce is a bit of an annoying algorithm, because it can be used in RL and SL..
-        average_episode_rewards = results_dict.pop(f"{results_type}/avg_episode_reward")
-        average_episode_returns = results_dict.pop(f"{results_type}/avg_episode_return")
-        average_episode_length = results_dict.pop(f"{results_type}/avg_episode_length")
-        rich.print(f"{results_type} Average episode rewards: {average_episode_rewards:.2f}")
-        rich.print(f"{results_type} Average episode returns: {average_episode_returns:.2f}")
-        rich.print(f"{results_type} Average episode length: {average_episode_length:.1}")
-        # NOTE: This is the "lower is better" value that is used for HParam sweeps. Does it make
-        # sense to use the (val/test) loss here? Or should we use -1 * rewards/returns?
-        error = loss
-    else:
-        accuracy: float = results_dict.pop(f"{results_type}/accuracy")
-        top5_accuracy: float = results_dict.pop(f"{results_type}/top5_accuracy")
-        rich.print(f"{results_type} top1 accuracy: {accuracy:.1%}")
-        rich.print(f"{results_type} top5 accuracy: {top5_accuracy:.1%}")
-        # NOTE: This is the value that is used for HParam sweeps.
-        error = 1 - accuracy
+    accuracy: float = results_dict.pop(f"{results_type}/accuracy")
+    top5_accuracy: float = results_dict.pop(f"{results_type}/top5_accuracy")
+    rich.print(f"{results_type} top1 accuracy: {accuracy:.1%}")
+    rich.print(f"{results_type} top5 accuracy: {top5_accuracy:.1%}")
+    # NOTE: This is the value that is used for HParam sweeps.
+    error = 1 - accuracy
 
     for key, value in results_dict.items():
         rich.print(f"{results_type} {key}: ", value)

@@ -10,7 +10,6 @@ from hydra.utils import instantiate
 from lightning import Callback, Trainer, seed_everything
 
 from beyond_backprop.algorithms import Algorithm
-from beyond_backprop.algorithms.rl_example.rl_datamodule import RlDataModule
 from beyond_backprop.configs.config import Config
 from beyond_backprop.datamodules.datamodule import DataModule
 from beyond_backprop.datamodules.image_classification import ImageClassificationDataModule
@@ -134,31 +133,6 @@ def instantiate_network(network_hparams: Network.HParams, datamodule: DataModule
             n_classes=datamodule.num_classes,  # type: ignore
             hparams=network_hparams,
         )
-
-    elif isinstance(datamodule, RlDataModule):
-        # TODO: Make this more general: Reinforce should be able to use other architectures on SL
-        # problems also.
-        if issubclass(network_type, FcNet):
-            assert isinstance(network_hparams, FcNet.HParams)
-            network = fcnet_for_env(
-                observation_space=datamodule.env.observation_space,
-                action_space=datamodule.env.action_space,
-                hparams=network_hparams,
-            )
-        else:
-            # TODO: These networks assume that the input are images. For now we tried CartPole with
-            # Reinforce, but we could potentially try other Gym envs with Pixel observations.
-            assert isinstance(datamodule.env.observation_space, spaces.Box)
-            assert len(datamodule.env.observation_space.shape) == 3
-            n_channels = datamodule.env.observation_space.shape[0]
-            assert isinstance(datamodule.env.action_space, spaces.Discrete)
-            n_classes = datamodule.env.action_space.n
-            # TODO: Make this a bit more generic perhaps?
-            network = network_type(
-                in_channels=n_channels,
-                n_classes=n_classes,
-                hparams=network_hparams,
-            )
     else:
         raise NotImplementedError(datamodule, network_hparams)
     assert network.hparams is network_hparams

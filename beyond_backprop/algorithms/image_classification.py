@@ -42,8 +42,6 @@ class ImageClassificationAlgorithm(Algorithm[NetworkType, tuple[Tensor, Tensor]]
         super().__init__(datamodule=datamodule, network=network, hp=hp)
         self.datamodule: ImageClassificationDataModule
         # NOTE: Setting this property allows PL to infer the shapes and number of params.
-        # TODO: Check if PL now moves the `example_input_array` to the right device automatically.
-        # If possible, we'd like to remove any reference to the device from the algorithm.
         device = get_device(network)
         self.example_input_array = torch.rand(
             [datamodule.batch_size, *datamodule.dims],
@@ -51,9 +49,6 @@ class ImageClassificationAlgorithm(Algorithm[NetworkType, tuple[Tensor, Tensor]]
         )
         num_classes: int = datamodule.num_classes
 
-        # IDEA: Could use a dict of metrics from torchmetrics instead of just accuracy:
-        # self.supervised_metrics: dist[str, Metrics]
-        # NOTE: Need to have one per phase! Not 100% sure that I'm not forgetting a phase here.
         self.train_accuracy = MulticlassAccuracy(num_classes=num_classes)
         self.val_accuracy = MulticlassAccuracy(num_classes=num_classes)
         self.test_accuracy = MulticlassAccuracy(num_classes=num_classes)
@@ -92,7 +87,6 @@ class ImageClassificationAlgorithm(Algorithm[NetworkType, tuple[Tensor, Tensor]]
         - the main metrics are logged inside `training_step_end` (supposed to be better for DP/DDP)
         """
 
-    # TODO: Log the metrics here, so they are consistent between all the models.?
     def training_step_end(self, step_output: StepOutputDict) -> StepOutputDict:
         """Called with the results of each worker / replica's output.
 
@@ -107,8 +101,6 @@ class ImageClassificationAlgorithm(Algorithm[NetworkType, tuple[Tensor, Tensor]]
         return self.shared_step_end(step_output, phase="test")
 
     def shared_step_end(self, step_output: StepOutputDict, phase: PhaseStr) -> StepOutputDict:
-        # TODO: Use the '__required_keys__'  and '__optional_keys__' on the TypedDict instead of
-        # hard-coding these.
         required_entries = ("logits", "y")
         if not isinstance(step_output, dict):
             raise RuntimeError(
@@ -131,7 +123,6 @@ class ImageClassificationAlgorithm(Algorithm[NetworkType, tuple[Tensor, Tensor]]
         assert isinstance(accuracy, MulticlassAccuracy)
         assert isinstance(top5_accuracy, MulticlassAccuracy)
 
-        # TODO: It's a bit confusing, not sure if this is the right way to use this:
         accuracy(probs, y)
         top5_accuracy(probs, y)
 

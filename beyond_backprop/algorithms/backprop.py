@@ -31,8 +31,6 @@ logger = getLogger(__name__)
 class Backprop(ImageClassificationAlgorithm):
     """Baseline model that uses normal backpropagation."""
 
-    # TODO: Make this less specific to Image classification once we add other supervised learning
-    # settings.
 
     @dataclass
     class HParams(ImageClassificationAlgorithm.HParams):
@@ -49,7 +47,6 @@ class Backprop(ImageClassificationAlgorithm):
         max_epochs: int = 90
 
         # Hyper-parameters for the forward optimizer
-        # BUG: seems to be reproducible given a seed when using SGD, but not when using Adam!
         optimizer: AdamConfig = AdamConfig(lr=3e-4)
 
         # batch size
@@ -72,7 +69,6 @@ class Backprop(ImageClassificationAlgorithm):
         # Initialize any lazy weights.
         _ = self.network(self.example_input_array)
 
-        # TODO: Check that this works with the dataclasses.
         self.save_hyperparameters({"network_type": type(network), "hp": self.hp})
 
     def make_forward_network(self, base_network: nn.Module) -> nn.Module:

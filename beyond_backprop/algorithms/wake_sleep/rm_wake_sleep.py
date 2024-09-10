@@ -81,11 +81,6 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
             if layer.input_layer == False:
                 self.non_input_layers.append(layer)
 
-        # self.non_input_layers = []
-        # for layer in self.network.graph.nodes():
-        #     if layer.input_layer == False:
-        #         self.non_input_layers.append(layer)
-
     def make_forward_network(self, base_network: WakeSleepNetworkType) -> InfGenNetwork:
         """Creates the forward network by adapting the base network."""
         assert isinstance(base_network, InfGenNetwork)
@@ -110,7 +105,6 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
             forward_optim, backward_optim, class_optim
         ]
 
-    #     self.forward_network.loss = self.pre_grad_gen + self.pre_grad_inf
     def training_step(
         self, batch: tuple[Tensor, Tensor], batch_idx: int
     ) -> StepOutputDict:
@@ -127,36 +121,29 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
         Returns a dictionary with some items that are used by the base class.
         """
         x, y = batch
-        # if self.burn_in_counter == 0:
         self.x = x    
         self.y = y
         training = phase == "train"
         gen_opt, inf_opt, class_opt = self.optimizers()
-        #optimize generative weights
 
         self.network(self.x)
 
         
         logits = self.network.ts[-1].output
-        # reward = (torch.argmax(logits, axis = 1) == y).float().detach()#torch.exp(((torch.argmax(logits, axis = 1) == y).float().detach() - 1)/self.reward_temp)
-        # reward = reward#/torch.sum(reward)
-        total_likelihood_gen_rm = - self.network.gen_log_prob()#self.network.diagonal_normal_KL(x, gen = True)#- reward * self.network.gen_log_prob() #
+        total_likelihood_gen_rm = - self.network.gen_log_prob()
 
         self.pre_grad_gen = torch.mean(total_likelihood_gen_rm)
         self.wake_phase_counter += 1
-        #batch_loss = self.pre_grad_gen
-        # network_output = self.network.ts[3].output #self.network.ts[4].output
-        network_output = self.network.ts[1].output #self.network.ts[4].output
+        network_output = self.network.ts[1].output 
 
-        logits = self.network.classifier(network_output)#F.one_hot(y, num_classes = self.network.n_classes).float()
-        #batch_loss = self.pre_grad_gen# + self.pre_grad_inf
+        logits = self.network.classifier(network_output)
+
         batch_loss = F.nll_loss(logits, y)    
 
         if training:
             gen_opt.zero_grad()
             self.manual_backward(self.pre_grad_gen)
             gen_opt.step()
-            # self.log("reward", torch.mean(reward), prog_bar = True)
             self.log("gen_loss", self.pre_grad_gen, prog_bar = True)
 
             class_opt.zero_grad()
@@ -169,8 +156,7 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
                 self.sleep_phase_counter += 1
                 for ii in range(0,self.sleep_phase_length):
                     self.network.gen_forward()
-                    #logits = self.network.l3.gen_output
-                    total_likelihood_inf = -self.network.log_prob() #self.network.diagonal_normal_KL()#
+                    total_likelihood_inf = -self.network.log_prob()
                     self.pre_grad_inf = torch.mean(total_likelihood_inf)
                     self.log("inf_loss", self.pre_grad_inf, prog_bar = True)
                     if self.burn_in_counter >= self.burn_in_time:
@@ -178,8 +164,6 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
                         self.manual_backward(self.pre_grad_inf)
                         inf_opt.step()
         self.burn_in_counter += 1
-        # if not(training):
-        #     batch_loss = 0.
             
         return StepOutputDict(logits=logits.detach(), y=y, loss=batch_loss, log={})
 
@@ -199,7 +183,6 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
 
     def check_network(self, net: nn.Module):
         #CHECK that the network is an instance of a particular class
-        #super().check_network(net)
         #assert that both the inference graph and generative graph for the network are directed acyclic graphs
         assert isinstance(net.graph, nx.DiGraph) and isinstance(net.gen_graph, nx.DiGraph)
         assert nx.is_directed_acyclic_graph(net.graph) and nx.is_directed_acyclic_graph(net.gen_graph)
@@ -210,12 +193,7 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
         for node in net.graph.nodes:
             assert isinstance(node, layer.InfGenProbabilityLayer)
             #check to validate that the nodes aren't using rsample (that could cause problems for the differentiation.)
-            assert not(node.differentiable) 
-            
-        #check that every nondifferentiable ProbabilityLayer is included in the graph nodes
-        for module in net.modules():
-            if not(module in net.graph.nodes):
-                assert not(isinstance(module, layer.ProbabilityLayer) and module.differentiable == False)
+            assert not(node.differentiable)
 
     def forward(self, x: Tensor) -> Tensor:
         return self.network(x)

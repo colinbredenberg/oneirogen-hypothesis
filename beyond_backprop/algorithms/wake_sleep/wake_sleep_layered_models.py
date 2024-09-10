@@ -14,48 +14,34 @@ from dataclasses import dataclass
 from beyond_backprop.networks.network import Network
 
 
-def generic_meannoise_layer(in_dim, dim, out_dim, sigma_inf, sigma_gen, flatten=False, dropout=False, masking = False, batch_norm = True, dendrites = True):
+def generic_meannoise_layer(in_dim, dim, out_dim, sigma_inf, sigma_gen, flatten=False, batch_norm = True, dendrites = True):
     branch_num = 16
-    gen_dendrite_nl = nn.Tanh() # nn.Softmax(dim=-1) #nn.LogSoftmax(dim = -1)#
-    inf_dendrite_nl = nn.Tanh() # nn.Softmax(dim=-1) #nn.LogSoftmax(dim = -1)#nn.Tanh()#nn.Softmax(dim=-1)
+    gen_dendrite_nl = nn.Tanh()
+    inf_dendrite_nl = nn.Tanh()
     if dendrites:
         gen_mean_func_list = [layer.BranchedDendrite(out_dim, branch_num, dim, gen_dendrite_nl, batch_norm = batch_norm)]#
     else:
         gen_mean_func_list = [nn.Linear(out_dim, dim), nn.Tanh()]
         if batch_norm:
             gen_mean_func_list += [nn.BatchNorm1d(dim, affine = False)]
-    # gen_var_func_list = [nn.Linear(out_dim, dim), nn.Sigmoid()]
-    if dropout:
-        # gen_mean_func_list = [nn.Dropout(p=0.5), *gen_mean_func_list]
-        1+1
+
     gen_mean_func = nn.Sequential(*gen_mean_func_list)
-    # gen_var_func = nn.Sequential(*gen_var_func_list)
+
     if dendrites:
         mean_func_list = [layer.BranchedDendrite(in_dim, branch_num, dim, inf_dendrite_nl, batch_norm = batch_norm)]
     else:
         mean_func_list = [nn.Linear(in_dim, dim), nn.Tanh()]
         if batch_norm:
              mean_func_list += [nn.BatchNorm1d(dim, affine = False)]
-    # var_func_list = [nn.Linear(in_dim, dim), nn.Sigmoid()]
-    if dropout:
-        mean_func_list = [nn.Dropout(p=0.5), *mean_func_list]
-    if masking:
-        transform = v2.RandomErasing(p=0.5, scale = (1/8, 1/4), ratio = (0.3,3.3), value = 0)
-        mean_func_list = [transform, *mean_func_list]
-        # var_func_list = [nn.Dropout(p=0.5), *var_func_list]
+
     if flatten:
         mean_func_list = [nn.Flatten(), *mean_func_list]
-        # var_func_list = [nn.Flatten(), *var_func_list]
     mean_func = nn.Sequential(*mean_func_list)
-    # var_func = nn.Sequential(*var_func_list)
     funcs = {
         "inf": layer.MeanPlusNoise(dim, mean_func, sigma_inf),
         "gen": layer.MeanPlusNoise(dim, gen_mean_func, sigma_gen),
     }
-    # funcs = {
-    #     "inf": layer.MeanExpScale(mean_func, var_func),
-    #     "gen": layer.MeanExpScale(gen_mean_func, gen_var_func),
-    # }
+
     dists = [
         lambda x: Independent(Normal(x[0], x[1]), 1),
         lambda x: Independent(Normal(x[0], x[1]), 1),
@@ -84,8 +70,7 @@ def generic_denoise_block(in_dim, dim, out_dim, sigma_inf, sigma_gen, beta, flat
     
     gen_mean_func_list = [nn.Linear(out_dim, dim), nn.Tanh()]
     gen_mean_func = nn.Sequential(*gen_mean_func_list)
-    # l_denoise_nl = layer.DiffusionGenNL(dim, 1)
-    l_denoise_mean_func = layer.DiffusionInf(beta) # layer.DiffusionGen(l_denoise_nl, beta)#
+    l_denoise_mean_func = layer.DiffusionInf(beta)
     l_denoise_funcs = {"inf": layer.MeanPlusNoise(dim, l_denoise_mean_func, np.sqrt(beta)),
                 "gen": layer.MeanPlusNoise(dim, gen_mean_func, sigma_gen)}
     l_denoise_dists = [lambda x: Independent(Normal(x[0], x[1]),1), lambda x: Independent(Normal(x[0],x[1]),1)]
@@ -193,7 +178,6 @@ class FCWSLayeredModel(InfGenNetwork):
 
         super().__init__(graphs=[graph, gen_graph])
         self.classifier = nn.Sequential(nn.Linear(hparams.layer_widths[0], 256), nn.Tanh(), nn.Linear(256,hparams.n_classes),  nn.LogSoftmax())
-        print(self.parameters())
 
 class LayerwiseDiffusionModel(InfGenNetwork):
     """Network composed of K sequential fully connected MLP layers of prespecified width for
@@ -299,4 +283,3 @@ class LayerwiseDiffusionModel(InfGenNetwork):
 
         super().__init__(graphs=[graph, gen_graph])
         self.classifier = nn.Sequential(nn.Linear(hparams.layer_widths[0], 256), nn.Tanh(), nn.Linear(256,hparams.n_classes),  nn.LogSoftmax())
-        print(self.parameters())

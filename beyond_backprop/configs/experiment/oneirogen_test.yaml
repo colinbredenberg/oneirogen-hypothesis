@@ -1,12 +1,12 @@
 # @package _global_
 
 # to execute this experiment run:
-# python main.py experiment=example
+# python main.py experiment=oneirogen_test
 
 defaults:
   - override /datamodule: mnist
   - override /algorithm: rm_wake_sleep
-  - override /network: fcwsmodel #diffusion_conv
+  - override /network: fcwsmodel
   - override /trainer: cpu
   - override /trainer/callbacks: no_checkpoints
 

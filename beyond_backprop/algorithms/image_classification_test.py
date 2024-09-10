@@ -54,8 +54,6 @@ class ImageClassificationAlgorithmTests(AlgorithmTests[ImageAlgorithmType]):
         # By how much the model should be better than chance accuracy to pass this test.
         num_training_iterations = 10
 
-        # FIXME: This threshold is really low, we should expect more like > 90% accuracy, but it's
-        # currently taking a long time to get those values.
         better_than_chance_threshold_pct = 0.10
 
         algorithm_name = self.algorithm_name or self.algorithm_cls.__name__.lower()
@@ -68,7 +66,6 @@ class ImageClassificationAlgorithmTests(AlgorithmTests[ImageAlgorithmType]):
                 f"network={network_name}",
                 f"datamodule={datamodule_name}",
                 "seed=123",
-                # "trainer.detect_anomaly=true",
                 "~trainer/logger",
                 "trainer/callbacks=no_checkpoints",
                 "+trainer.overfit_batches=1",

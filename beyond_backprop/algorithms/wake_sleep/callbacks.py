@@ -243,7 +243,6 @@ class ApicalBasalAlignment(Callback):
         return
 
 def dynamic_mixed_samples_plot(sample_data, log_dir):
-    mixing_constant = np.arange(0,1.1,0.1)
     sample_data[torch.where(sample_data < 0)] = 0
     sample_data[torch.where(sample_data > 1)] = 1
     frame_size = tuple(sample_data.shape[-3:-1])
@@ -274,14 +273,12 @@ def figure_to_array(fig):
     return fig_array
 
 def dynamic_mixed_samples_pyplot(sample_data, log_dir):
-    mixing_constant = np.arange(0,1.1,0.1)
     sample_data[torch.where(sample_data < 0)] = 0
     sample_data[torch.where(sample_data > 1)] = 1
     file_handle = 'Dynamic mixed samples image.mp4'
     filename = str(log_dir / file_handle)
     frame_size = (1000, 1000)
     output = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), 60, frame_size)
-    mixing_constant = np.arange(0,1,0.2)
     T = sample_data.shape[2]
     fig, axes = plt.subplots(6, 6, sharey = True, sharex = True, figsize = (10, 10))
     for tt in range(0,T):
@@ -295,9 +292,7 @@ def dynamic_mixed_samples_pyplot(sample_data, log_dir):
                     labelbottom=False)
                 if ii == 0:
                     axes[ii,jj].set_title(r'$\alpha : %1.2f$' %(idx_j*0.2), fontsize = fontsize)
-        # fig.tight_layout()
         fig_array = figure_to_array(fig)
-        #fig_array = cv2.resize(fig_array, frame_size)
         output.write(fig_array)
     output.release()
     cv2.destroyAllWindows()
@@ -396,15 +391,11 @@ def classifier_dist_plot(classifier_dist, log_dir, indicator = ""):
     plt.savefig(str(log_dir / path), format = 'pdf')
     return
 
-# def dynamic_across_stim_var_plot(mean_delta_variance, std_delta_variance, mean_inact_variance, std_inact_variance, log_dir, indicator = ""):
 def dynamic_across_stim_var_plot(mean_var_ratio, std_var_ratio, log_dir, indicator = ""):   
     #generate plots
     fig, axes = plt.subplots(1,1,figsize = (1.5,1.5))
-    # plt.errorbar(torch.arange(0,11), mean_delta_variance, yerr = std_delta_variance)
-    # plt.errorbar(torch.arange(0,11), mean_inact_variance, yerr = std_inact_variance)
     plt.errorbar(torch.arange(0,11), mean_var_ratio, yerr = std_var_ratio)
     plt.plot(torch.arange(0,11), torch.ones(11), 'k')
-    # plt.legend(['no inact', 'inact'], fontsize = fontsize)
     plt.xticks(ticks = torch.arange(0,11), labels = [r"$\alpha$ = 0", r"$\alpha$ = 0.1", r"$\alpha$ = 0.2", r"$\alpha$ = 0.3", r"$\alpha$ = 0.4", r"$\alpha$ = 0.5", r"$\alpha$ = 0.6", r"$\alpha$ = 0.7", r"$\alpha$ = 0.8", r"$\alpha$ = 0.9", r"$\alpha$ = 1"], rotation = 90, fontsize = fontsize)
     plt.title("Dose Dependence of Across-Stim Variance", fontsize = fontsize)
     axes.spines.top.set_visible(False)
@@ -459,7 +450,6 @@ def dynamic_corr_comparisons_plot(corr_list, log_dir, indicator = ""):
         if jj == 0:
             corr_0 = corr
             corr_0_full = corr_full
-        #sample_data = sample_data
         im = axes[jj].imshow(corr - torch.eye(*corr.shape), vmin = -1, vmax = 1)
         fig.colorbar(im, ax = axes[jj])
         axes[jj].set_title(r'$\alpha : %1.2f$' %(jj*0.1), fontsize = fontsize)
@@ -538,7 +528,6 @@ class DynamicMixedSampler(Callback):
             plasticity_eps = 1e-2
             sample_data = torch.zeros(6,11,T, *pl_module.x[0,...].permute(1,2,0).shape)
             
-            of_rad = 5
             x = pl_module.x
             y = pl_module.y
             timescale = 0.1

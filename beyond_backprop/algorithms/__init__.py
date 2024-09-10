@@ -19,7 +19,6 @@ from .image_classification import ImageClassificationAlgorithm
 # from the command-line, and be validated against the schema.
 
 _cs = ConfigStore.instance()
-# _cs.store(group="algorithm", name="algorithm", node=Algorithm.HParams())
 _cs.store(group="algorithm", name="backprop", node=Backprop.HParams())
 _cs.store(group="algorithm", name = "rm_wake_sleep", node = RMWakeSleep.HParams())
 _cs.store(group= "network", name = "fcwsmodel", node = FCWSLayeredModel.HParams())

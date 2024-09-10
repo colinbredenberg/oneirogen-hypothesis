@@ -123,9 +123,6 @@ class AlgorithmTests(Generic[AlgorithmType]):
 
     # ----------- Test Fixtures ----------- #
 
-    # TODO: Instead of parametrizing by everything and then skipping only some, only parametrize by
-    # the supported ones. This isn't super important, but it would greatly reduce the number of
-    # tests by only generating those that should be run.
 
     @pytest.fixture(params=get_all_datamodule_names_params(), scope="class")
     def datamodule_name(self, request: pytest.FixtureRequest):
@@ -174,15 +171,10 @@ class AlgorithmTests(Generic[AlgorithmType]):
                 return_hydra_config=True,
             )
 
-            # BUG: Weird errors with Hydra variable interpolation.. Setting these manually seems
-            # to fix it for now..
             from hydra.conf import HydraHelpConf
             from hydra.core.hydra_config import HydraConfig
 
             with open_dict(config):
-                # BUG: Getting some weird Hydra omegaconf error in unit tests:
-                # "MissingMandatoryValue while resolving interpolation: Missing mandatory value:
-                # hydra.job.num"
                 config.hydra.job.num = 0
                 config.hydra.hydra_help = HydraHelpConf(hydra_help="", template="")
                 config.hydra.job.id = 0
@@ -216,11 +208,6 @@ class AlgorithmTests(Generic[AlgorithmType]):
             network_hparams, network_type.HParams  # type: ignore
         ), "HParams type should match net type"
         network = instantiate_network(network_hparams=network_hparams, datamodule=datamodule)
-        # network = network_type(
-        #     in_channels=datamodule.dims[0],
-        #     n_classes=datamodule.num_classes,  # type: ignore
-        #     hparams=network_hparams,
-        # )
         assert isinstance(network, nn.Module)
         return network
 
@@ -231,7 +218,6 @@ class AlgorithmTests(Generic[AlgorithmType]):
         NOTE: This should ideally be parametrized to test different hyperparameter settings.
         """
         return hydra_options.algorithm
-        # return self.algorithm_cls.HParams()
 
     @pytest.fixture
     def algorithm_kwargs(
@@ -239,7 +225,6 @@ class AlgorithmTests(Generic[AlgorithmType]):
     ):
         """Fixture that gives the keyword arguments to use to create the algorithm.
 
-        NOTE: This should be further parametrized by base classes as needed.
         """
         return dict(datamodule=datamodule, network=network, hp=hp)
 
@@ -274,7 +259,7 @@ class AlgorithmTests(Generic[AlgorithmType]):
                 "for example: `class TestMyAlgorithm(AlgorithmTests[MyAlgorithm]):`\n"
                 f"(Got {class_under_test})"
             )
-        return class_under_test  # type: ignore
+        return class_under_test  #
 
     @pytest.fixture(scope="class", params=["cpu", "gpu"])
     def accelerator(self, request: pytest.FixtureRequest):
@@ -301,14 +286,12 @@ class AlgorithmTests(Generic[AlgorithmType]):
         accelerator: str,
     ):
         """Tests that the training loss on a batch of data decreases after a training step."""
-        # TODO: Need to check that this still works for all algorithms.
         # x, y = training_batch
         # dataset = TensorDataset(x, y)
         # dataloader = DataLoader(dataset, batch_size=x.shape[0])
 
         my_callback = GetMetricCallback(self.metric_name)
         trainer = Trainer(
-            # limit_train_batches=2,
             max_epochs=2,
             overfit_batches=1,
             log_every_n_steps=1,
@@ -317,7 +300,6 @@ class AlgorithmTests(Generic[AlgorithmType]):
             devices=1,  # TODO: Test with multiple GPUs.
             accelerator=accelerator,
             callbacks=[my_callback],
-            # NOTE: Would be nice to be able to enforce this, but DTP uses nn.MaxUnpool2d.
             deterministic="warn",
         )
         assert algorithm.datamodule is datamodule
@@ -339,7 +321,6 @@ class AlgorithmTests(Generic[AlgorithmType]):
             f"algorithm={algorithm_name}",
             f"network={network_name}",
             f"datamodule={datamodule_name}",
-            # "debug=overfit",  # TODO: Update this. This won't work.
             "+trainer.limit_train_batches=3",
             "+trainer.limit_val_batches=3",
             "+trainer.limit_test_batches=3",
@@ -356,8 +337,3 @@ class AlgorithmTests(Generic[AlgorithmType]):
             performance_1 = main(config)
             performance_2 = main(config)
             assert performance_1 == performance_2
-
-    # TODOs:
-    # - Finish reading https://www.pytorchlightning.ai/blog/effective-testing-for-machine-learning-systems
-    # - Add more tests
-    # - Re-add DTP as an algorithm.

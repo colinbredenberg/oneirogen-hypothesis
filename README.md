@@ -7,6 +7,9 @@ This code repository was produced by simplifying and adapting the Mila IDT team'
 Also inspired / adapted from https://www.github.com/ernoult/ScalingDTP as well as https://github.com/ashleve/lightning-hydra-template
 
 ## Installation
+Step 1: Create a Python 3.9 virtual envioronment.
+
+Step 2: Within that environment, in the command line, run:
 
 ```console
 pip install -e .

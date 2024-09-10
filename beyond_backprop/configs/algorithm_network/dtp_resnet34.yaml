@@ -1,6 +1,0 @@
-# @package _global_
-# This is the default behaviour when using the DTP algorithm with the Resnet34 architecture.
-# TODO: Tune these hyper-parameters for each dataset of interest, and create a dedicated file in
-# the algorithm_network_datamodule folder.
-defaults:
-  - dtp_resnet18

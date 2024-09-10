@@ -1,3 +1,0 @@
-# @package _global_
-defaults:
-  - dtp_simple_vgg_mnist

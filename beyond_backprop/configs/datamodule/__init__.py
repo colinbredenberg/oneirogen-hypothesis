@@ -117,16 +117,6 @@ class MNISTDataModuleConfig(VisionDataModuleConfig):
     batch_size: int = 128
     train_transforms: MNISTTrainTransforms = field(default_factory=MNISTTrainTransforms)
 
-# @hydrated_dataclass(target=MovingMNISTDataModule, populate_full_signature=True)
-# class MovingMNISTDataModuleConfig(VisionDataModuleConfig):
-#     normalize: bool = True
-#     batch_size: int = 128
-#     train_transforms: MNISTTrainTransforms = field(default_factory = MNISTTrainTransforms)
-
-@hydrated_dataclass(target=FashionMNISTDataModule, populate_full_signature=True)
-class FashionMNISTDataModuleConfig(MNISTDataModuleConfig):
-    ...
-
 
 def cifar10_train_transforms():
     return transforms.Compose(
@@ -149,57 +139,7 @@ class CIFAR10DataModuleConfig(VisionDataModuleConfig):
     # Overwriting this one:
     batch_size: int = 128
 
-
-def imagenet32_train_transforms():
-    return transforms.Compose(
-        [
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomCrop(size=32, padding=4, padding_mode="edge"),
-            transforms.ToTensor(),
-            imagenet32_normalization(),
-        ]
-    )
-
-
-@hydrated_dataclass(target=imagenet32_train_transforms)
-class ImageNet32TrainTransforms:
-    ...
-
-
-@hydrated_dataclass(target=ImageNet32DataModule, populate_full_signature=True)
-class ImageNet32DataModuleConfig(VisionDataModuleConfig):
-    data_dir: Path = (
-        Path(os.environ["SCRATCH"]) / "data" / "imagenet32"
-        if "SCRATCH" in os.environ
-        else DATA_DIR / "imagenet32"
-    )
-
-    val_split: Union[int, float] = -1
-    num_images_per_val_class: int = 50  # Slightly different.
-    normalize: bool = True
-    train_transforms: ImageNet32TrainTransforms = field(default_factory=ImageNet32TrainTransforms)
-
-
-@hydrated_dataclass(target=RlDataModule, populate_full_signature=False)
-class RlDataModuleConfig(DataModuleConfig):
-    env: str = "CartPole-v1"
-    episodes_per_epoch: int = 100
-    batch_size: int = 1
-
-
-@hydrated_dataclass(target=INaturalistDataModule, populate_full_signature=True)
-class INaturalistDataModuleConfig(VisionDataModuleConfig):
-    data_dir: Optional[Path] = None
-    version: Version = "2021_train"
-    target_type: Union[TargetType, list[TargetType]] = "full"
-
-
 cs = ConfigStore.instance()
 cs.store(group="datamodule", name="base", node=DataModuleConfig)
 cs.store(group="datamodule", name="cifar10", node=CIFAR10DataModuleConfig)
 cs.store(group="datamodule", name="mnist", node=MNISTDataModuleConfig)
-cs.store(group="datamodule", name="fashion_mnist", node=FashionMNISTDataModuleConfig)
-cs.store(group="datamodule", name="imagenet32", node=ImageNet32DataModuleConfig)
-cs.store(group="datamodule", name="inaturalist", node=INaturalistDataModuleConfig)
-cs.store(group="datamodule", name="rl", node=RlDataModuleConfig)
-#cs.store(group="datamodule", name="moving_mnist", node=MovingMNISTDataModuleConfig)

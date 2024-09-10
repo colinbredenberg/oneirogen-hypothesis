@@ -25,5 +25,3 @@ hydra-orion-sweeper
 transformers
 diffusers
 opencv-python
-pyrtools
-plenoptic

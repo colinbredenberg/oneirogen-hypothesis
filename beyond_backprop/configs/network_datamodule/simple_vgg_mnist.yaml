@@ -1,6 +1,0 @@
-# @package _global_
-# These are overrides for the network architecture parameters for specific datasets.
-# This is mainly used to make the network shorter for MNIST, otherwise a RuntimeError occurs when
-# creating the network, because "Output size is too small".
-network:
-  channels: [128, 128, 256, 256]

@@ -2,15 +2,9 @@ from __future__ import annotations
 
 import torch
 from torch import nn, Tensor
-from beyond_backprop.algorithms.common.graph_utils import sequential_graph, multi_stream_graph
+
 import torch.nn.functional as F
-import torch.distributions as dist
-from torch.distributions.multivariate_normal import MultivariateNormal
-from torch.distributions.normal import Normal
-from torch.distributions.log_normal import LogNormal
-from torch.distributions.independent import Independent
-from torch.distributions.one_hot_categorical import OneHotCategorical
-from torch.distributions.bernoulli import Bernoulli
+
 import beyond_backprop.algorithms.common.layer as layer
 import networkx as nx
 from networkx import DiGraph

@@ -20,14 +20,10 @@ class InfGenNetwork(nn.Module):
         DAG that specifies the order of computation for inference
     gen_graph: nx.Digraph
         DAG that specifies the order of computation for generation
-    gen_subgraph: nx.Digraph
-        DAG that specifies the order of computation for generating activations for a subset of the nodes in the gen_graph
     ts: list
         List specifying an iterable ordering of nodes such that the required inputs from parents are always available for a child node for inference
     gen_ts: list
         List specifying an iterable ordering of nodes such that the required inputs from parents are always available for a child node for generation
-    gen_ts_subgraph: list
-        List specifying an iterable ordering of nodes such that the required inputs from parents are always available for a child node for generating a subset of the nodes
     inf_group: nn.ModuleList
         Module that can be used to process all of the inference parameters separately from the generative parameters
         e.g. w/ inf_group.parameters()
@@ -112,6 +108,9 @@ class InfGenNetwork(nn.Module):
             layer.forward(input_list, gen = True)
 
     def dynamic_mixed_forward(self, x: Tensor, T: int, mixing_constant: float, timescale: float, idxs: list[int], lesion_idxs: list[int] =[], apical_lesion_idxs: list[int] = [], mode = 'interp'):
+        """
+        Function for generating hallucinatory network activity determined by the value of mixing_constant. Calls the 'dynamic_mixed_forward' method for each layer in order
+        """
         self.eval()
         with torch.no_grad():
             self.forward(x)

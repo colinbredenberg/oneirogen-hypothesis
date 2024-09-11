@@ -15,6 +15,7 @@ from beyond_backprop.networks.network import Network
 
 
 def generic_meannoise_layer(in_dim, dim, out_dim, sigma_inf, sigma_gen, flatten=False, batch_norm = True, dendrites = True):
+    """Architecture used for intermediate layers of our single and multicompartment neuron models"""
     branch_num = 16
     gen_dendrite_nl = nn.Tanh()
     inf_dendrite_nl = nn.Tanh()
@@ -50,6 +51,7 @@ def generic_meannoise_layer(in_dim, dim, out_dim, sigma_inf, sigma_gen, flatten=
     return l
 
 def generic_denoise_block(in_dim, dim, out_dim, sigma_inf, sigma_gen, beta, flatten = False):
+    """Architecture used for intermediate layers of our recurrent neuron model"""
     diffusion_nl = layer.DiffusionGenNL(dim, 1)
     
     l_denoise_gen_func = layer.DiffusionGen(diffusion_nl, beta)
@@ -80,7 +82,7 @@ def generic_denoise_block(in_dim, dim, out_dim, sigma_inf, sigma_gen, beta, flat
 
 
 class FCWSLayeredModel(InfGenNetwork):
-    """Network composed of K sequential fully connected MLP layers of prespecified width for
+    """InfGenNetwork composed of sequential fully connected layers of prespecified width for
     learning on natural images."""
 
     @dataclass
@@ -180,7 +182,7 @@ class FCWSLayeredModel(InfGenNetwork):
         self.classifier = nn.Sequential(nn.Linear(hparams.layer_widths[0], 256), nn.Tanh(), nn.Linear(256,hparams.n_classes),  nn.LogSoftmax())
 
 class LayerwiseDiffusionModel(InfGenNetwork):
-    """Network composed of K sequential fully connected MLP layers of prespecified width for
+    """InfGenNetwork composed of fully connected layers with within-layer recurrence, of prespecified width for
     learning on natural images."""
 
     @dataclass

@@ -1,19 +1,23 @@
 """
 Classes for defining individual layers
+
+InfGenProbabilityLayer is the basic layer unit for our Wake-Sleep networks
+
+IGFuncLayerWrapper is a convenient wrapper for turning a top-down layer and a bottom-up layer into a single InfGenProbabilityLayer
+
+The remaining layers are used as inputs to IGFuncLayerWrapper
 """
+
 from __future__ import annotations
 from typing import Callable
 import torch
-from torch import autograd, nn, Tensor
-import torch.nn.functional as F
-import math
-from collections import OrderedDict
-from torch.distributions.log_normal import LogNormal
+from torch import nn, Tensor
+
 import numpy as np
-    
+
 class InfGenProbabilityLayer(nn.Module):
     """
-    Similar to ProbabilityLayer, except that it defines an inference distribution and a generative distribution,
+    Layer that it defines a bottom-up inference distribution and a top-down generative distribution,
     with separate distribution parameters, which are sampled through either forward() for gen_forward() respectively.
 
     Information about both outputs and both distribution parameters are stored separately for gradient computation.
@@ -49,21 +53,17 @@ class InfGenProbabilityLayer(nn.Module):
                   input_layer: bool = False, 
                   batch_num = [[], []],
                   shape = None,
-                  is_t0_layer: bool = True,
-                  is_transition_layer: bool = True
                   ):
         super().__init__()
-        self.dist = dists[0]
-        self.gen_dist = dists[1]
-        self.input_layer = input_layer
-        self.differentiable = differentiable
-        self.func = None
-        self.gen_func = None
-        self.batch_num = batch_num[0]
-        self.batch_num_gen = batch_num[1]
+        self.dist = dists[0] #function to construct the inference probability distribution (e.g. self.dist([x,y]) makes a normal distribution with mean x and var y)
+        self.gen_dist = dists[1] #function to construct a generative probability distribution
+        self.input_layer = input_layer #bool to indicate whether or not the layer receives stimulus inputs
+        self.differentiable = differentiable #bool to indicate whether rsample or sample should be used (in all networks we use, differentiable=False)
+        self.func = None #function to produce the inputs for dist (e.g. self.func(input) = [x,y], then self.dist([x,y]) makes a normal distribution with mean x and var y)
+        self.gen_func = None #function to produce the inputs for gen_dist
+        self.batch_num = batch_num[0] #number of samples in each inference batch
+        self.batch_num_gen = batch_num[1] #number of samples in each generative batch
         self.shape = shape
-        self.is_t0_layer = is_t0_layer
-        self.is_transition_layer = is_transition_layer
 
     def forward(self, x: Tensor, gen = False):
         if not gen:
@@ -74,43 +74,46 @@ class InfGenProbabilityLayer(nn.Module):
             self.gen_dist_params = self.calc_dist_params(x, gen = True)
             self.gen_output = self.sample(gen = True)
             return self.gen_output
-        
-    def mixed_forward(self, x: Tensor, mixing_constant: float):
-        self.forward(x, gen = True)
-        if self.dist is LogNormal:
-            self.mixed_output = self.output**(mixing_constant) * self.gen_output**(1-mixing_constant)
-        else:
-            tau = 0.35
-            self.mixed_output = tau * torch.log(mixing_constant * torch.exp(self.output/tau) + (1-mixing_constant) * torch.exp(self.gen_output/tau))
 
-    def dynamic_mixed_forward(self, x, x_gen, mixing_constant: float, timescale: float, geometric_mean = False, apical_lesion = False, mode = 'interp'):
+    def dynamic_mixed_forward(self, x, x_gen, mixing_constant: float, timescale: float, apical_lesion = False, mode = 'interp'):
+        """Function for sampling neural activity in a single layer based on a mixture of top-down and bottom-up input.
+
+        Layers are coordinated by the dynamic_mixed_forward method of the InfGenNetwork class
+
+        We use this in the DynamicMixedSampler callback, after a network has been trained, to simulate hallucination.
+        NOTE: currently assumes that self.dist and self.gen_dist are both Normal distributions
+
+        Inputs:
+        x: bottom-up input
+        x_gen: top-down input
+        mixing_constant: determines how much bottom-up vs top-down inputs determine network activity
+        timescale: determines speed at which network activity evolves through time
+        apical_lesion: determines whether top-down inputs are silenced
+        mode: options of 'interp' (interpolated sampling), 'noise' (noise-based protocol), 'excitability' (hallucination is modeled as an excitability change)
+        """
         self.forward(x)
         self.forward(x_gen, gen= True)
         inf_params = self.dist_params
         gen_params = self.gen_dist_params
-        if geometric_mean:
-            mean = torch.relu(inf_params[0])**(mixing_constant) * torch.relu(gen_params[0])**(1-mixing_constant)
-            var = torch.relu(inf_params[1])**(mixing_constant) * torch.relu(gen_params[1])**(1-mixing_constant)
-        else:
-            tau = 0.35
-            if mode == 'interp':
-                if not(apical_lesion):
-                    mean = tau * torch.log(mixing_constant * torch.exp(inf_params[0]/tau) + (1-mixing_constant) * torch.exp(gen_params[0]/tau))
-                    var = tau * torch.log(mixing_constant * torch.exp(inf_params[1]/tau) + (1-mixing_constant) * torch.exp(gen_params[1]/tau))
+        tau = 0.35
+        if mode == 'interp':
+            if not(apical_lesion):
+                mean = tau * torch.log(mixing_constant * torch.exp(inf_params[0]/tau) + (1-mixing_constant) * torch.exp(gen_params[0]/tau))
+                var = tau * torch.log(mixing_constant * torch.exp(inf_params[1]/tau) + (1-mixing_constant) * torch.exp(gen_params[1]/tau))
+            else:
+                if torch.cuda.is_available():
+                    mean = tau * torch.log(mixing_constant * torch.exp(inf_params[0]/tau) + (1-mixing_constant) * torch.exp(torch.zeros(gen_params[0].shape, device = torch.cuda.current_device())/tau))
                 else:
-                    if torch.cuda.is_available():
-                        mean = tau * torch.log(mixing_constant * torch.exp(inf_params[0]/tau) + (1-mixing_constant) * torch.exp(torch.zeros(gen_params[0].shape, device = torch.cuda.current_device())/tau))
-                    else:
-                        mean = tau * torch.log(mixing_constant * torch.exp(inf_params[0]/tau) + (1-mixing_constant) * torch.exp(torch.zeros(gen_params[0].shape)/tau))
-                    var = tau * torch.log(mixing_constant * torch.exp(inf_params[1]/tau) + (1-mixing_constant) * torch.exp(gen_params[1]/tau))
-            elif mode == 'noise':
-                mean = inf_params[0]
-                var_slope = 1
-                var = inf_params[1] + var_slope * (1-mixing_constant)
-            elif mode == 'excitability':
-                mean_slope = 1
-                mean = inf_params[0] * (1 + mean_slope * (1-mixing_constant))
-                var = inf_params[1]
+                    mean = tau * torch.log(mixing_constant * torch.exp(inf_params[0]/tau) + (1-mixing_constant) * torch.exp(torch.zeros(gen_params[0].shape)/tau))
+                var = tau * torch.log(mixing_constant * torch.exp(inf_params[1]/tau) + (1-mixing_constant) * torch.exp(gen_params[1]/tau))
+        elif mode == 'noise':
+            mean = inf_params[0]
+            var_slope = 1
+            var = inf_params[1] + var_slope * (1-mixing_constant)
+        elif mode == 'excitability':
+            mean_slope = 1
+            mean = inf_params[0] * (1 + mean_slope * (1-mixing_constant))
+            var = inf_params[1]
 
         dist = self.dist([timescale * mean, torch.sqrt(torch.tensor(timescale)) * var])
         output_update = dist.sample()
@@ -137,6 +140,7 @@ class InfGenProbabilityLayer(nn.Module):
         return x
 
     def log_prob(self, x: Tensor | None = None, output: Tensor | None = None, gen: bool = False):
+        """Used to calculate the loss for a single network layer"""
         if ((x is None) or (output is None)):
             if not(gen):
                 self.predicted_activity_inf = self.dist_params
@@ -192,12 +196,10 @@ class IGFuncLayerWrapper(InfGenProbabilityLayer):
                  stack = True,
                  gen_stack = True,
                  flatten = False,
-                 shape = None,
-                 is_t0_layer: bool = True,
-                 is_transition_layer: bool = True):
+                 shape = None):
         #idxs specifies which input indices to process. This is only important if different parts of the input are sent to different areas of the network
         input_layer = not(idxs is None)
-        super().__init__(dists, differentiable = differentiable, input_layer = input_layer, batch_num = batch_num, shape = shape, is_t0_layer = is_t0_layer, is_transition_layer = is_transition_layer)
+        super().__init__(dists, differentiable = differentiable, input_layer = input_layer, batch_num = batch_num, shape = shape)
         self.stack = stack
         self.gen_stack = gen_stack
         self.flatten = flatten
@@ -241,6 +243,7 @@ class View(nn.Module):
             return x.view([*self.shape])
     
 class MeanParams(nn.Module):
+    """A nn.Module layer that outputs a stored mean and variance. Used for the top-layer of a generative network"""
     def __init__(self, N: int, batch_size: int, mean_val: float = 0., scale: float = 1.):
         super().__init__()
         self.mean = torch.nn.Parameter(mean_val * torch.ones(batch_size, N), requires_grad = False)
@@ -249,6 +252,7 @@ class MeanParams(nn.Module):
         return [self.mean, self.scale]
     
 class MeanPlusNoise(nn.Module):
+    """A nn.Module layer that is used to parameterize a Normal distribution with an input-dependent mean and a constant variance"""
     def __init__(self, N, mean_func: Callable[[Tensor],Tensor], scale):
         super().__init__()
         self.mean_func = mean_func
@@ -262,6 +266,7 @@ class MeanPlusNoise(nn.Module):
         return [self.mean_func(x), self.scale]
 
 class MeanExpScale(nn.Module):
+    """A nn.Module layer that is used to parameterize a normal distribution with an input-dependent mean and variance, as in the final layer of a VAE"""
     def __init__(self, 
                  mean_func: Callable[[Tensor],Tensor],
                  scale_func: Callable[[Tensor],Tensor], 
@@ -274,16 +279,17 @@ class MeanExpScale(nn.Module):
         return [self.mean_func(x), torch.exp(self.scale_func(x))]
 
 class BranchedDendrite(nn.Module):
+    """The multicompartment dendrite layer used in the main results of the paper"""
     def __init__(self, dim_in, branch_num, dim_out, nl: nn.Module, batch_norm = True):
         super().__init__()
-        self.branch_num = branch_num
+        self.branch_num = branch_num #number of dendritic branches
         self.dim_out = dim_out
         self.lin_1 = nn.Linear(dim_in, branch_num * dim_out) #nn.Linear(dim_in, [branch_num, dim_out])
         self.lin_2 = nn.Linear(branch_num, dim_out)
 
-        #Enforce positivity in lin_2 and lin_3, since these are meant to be resistances, and resistances can't change the sign of the input current
+        #Enforce positivity in lin_2 and lin_3, since these are meant to be conductances, and conductances can't change the sign of the input current
         self.lin_2.weight.data = torch.abs(self.lin_2.weight.data)
-        # self.lin_3.weight.data = torch.abs(self.lin_3.weight.data)
+
         self.batch_norm_bool = batch_norm
         self.batch_norm = nn.BatchNorm1d(branch_num * dim_out, affine = True)
         self.batch_norm_2 = nn.BatchNorm1d(dim_out, affine = False)
@@ -291,19 +297,17 @@ class BranchedDendrite(nn.Module):
         self.nl_2 = nn.Tanh()
 
     def forward(self, x):
-        #Enforce positivity in lin_2 and lin_3, since these are meant to be resistances, and resistances can't change the sign of the input current
+        #Enforce positivity in lin_2, since these are meant to be conductances, and conductances can't change the sign of the input current
         self.lin_2.weight.data = torch.clamp(self.lin_2.weight.data, min = 0)
-        # self.lin_3.weight.data = torch.clamp(self.lin_3.weight.data, min = 0)
 
         #First set of dendritic branches
         x = self.lin_1(x)
-        # x = x.view([x.shape[0], self.dim_out, self.branch_num])
-        # if self.batch_norm_bool:
+
         x = self.batch_norm(self.nl(x).flatten(start_dim = 1)).view([x.shape[0], self.dim_out, self.branch_num])
-        # x = self.nl(x).flatten(start_dim = 1).view([x.shape[0], self.dim_out, self.branch_num])
 
         #second set of dendritic branches
-        x = torch.sum(x * self.lin_2.weight, dim = -1) + self.lin_2.bias#self.lin_2(x)
+        x = torch.sum(x * self.lin_2.weight, dim = -1) + self.lin_2.bias
+
         #final nonlinearity
         x = self.nl_2(x).flatten(start_dim = 1)
         if self.batch_norm_bool:
@@ -311,6 +315,7 @@ class BranchedDendrite(nn.Module):
         return x
 
 class DiffusionInf(nn.Module):
+    """Simple layer in our recurrent network model that replaces part of the layer state x with noise"""
     def __init__(self, beta):
         super().__init__()
         self.beta = beta
@@ -319,6 +324,7 @@ class DiffusionInf(nn.Module):
         return np.sqrt(1 - self.beta) * x
     
 class DiffusionGenNL(nn.Module):
+    """Nonlinearity for implementing a T timesteps of recurrent processing in a given layer. We take T=1 for all results"""
     def __init__(self, N, T):
         super().__init__()
         self.N = N
@@ -326,7 +332,7 @@ class DiffusionGenNL(nn.Module):
         self.T_ctr = 0
         self.lin = nn.Linear(N,N)
         self.lin2 = nn.Linear(N,N)
-        # self.lin3 = nn.Linear(N,N)
+
         self.nl = nn.Tanh()
         self.nl2 = nn.Sigmoid()
 
@@ -336,15 +342,16 @@ class DiffusionGenNL(nn.Module):
         else:
             self.state_prev = self.state
         self.gate = self.nl2(self.lin2(x))
-        # self.attention = self.nl2(self.lin3(x))
+
         self.state = self.state_prev + self.gate*self.nl(self.lin(x))
         if self.T_ctr == self.T - 1:
             self.T_ctr = 0
         else:
             self.T_ctr += 1
-        return self.state #self.lin_2(self.nl(self.lin(x)))
+        return self.state
 
 class DiffusionGen(nn.Module):
+    """Essentially just functions as a nonlinearity layer"""
     def __init__(self, nl, beta):
         super().__init__()
         self.nl = nl

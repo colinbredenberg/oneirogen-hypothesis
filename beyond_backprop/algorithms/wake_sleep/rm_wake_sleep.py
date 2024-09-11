@@ -13,8 +13,6 @@ from torch.nn import functional as F
 
 from lightning import Callback
 
-from beyond_backprop.configs.lr_scheduler import CosineAnnealingLRConfig
-from beyond_backprop.configs.optimizer import SGDConfig
 from beyond_backprop.configs.optimizer import AdamConfig
 from beyond_backprop.datamodules.image_classification import (
     ImageClassificationDataModule,
@@ -141,6 +139,7 @@ class RMWakeSleep(ImageClassificationAlgorithm[WakeSleepNetworkType]):
         batch_loss = F.nll_loss(logits, y)    
 
         if training:
+            #Calculate parameter updates for the generative parameters
             gen_opt.zero_grad()
             self.manual_backward(self.pre_grad_gen)
             gen_opt.step()

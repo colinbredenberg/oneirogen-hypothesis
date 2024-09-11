@@ -1,9 +1,16 @@
+"""
+Analysis code for processing trained networks
+
+These are callbacks, called by Pytorch Lightning functionality at various points in training
+
+Results are stored in the logs folder
+"""
+
 from __future__ import annotations
 
 from logging import getLogger as get_logger
 from pathlib import Path
 import torch
-import torch.nn.functional as F
 from lightning import Callback, Trainer
 from torch import Tensor
 import cv2
@@ -13,9 +20,7 @@ from beyond_backprop.algorithms.algorithm import Algorithm
 from beyond_backprop.datamodules.dataset_normalizations import cifar10_unnormalization
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.linear_model import Lasso
 from sklearn.decomposition import PCA
-from scipy.linalg import sqrtm
 from torch.distributions.multivariate_normal import MultivariateNormal
 logger = get_logger(__name__)
 basal_color = '#72a6ca'
@@ -23,6 +28,9 @@ apical_color = '#e0474c'
 fontsize = 5
 
 def generated_image_plot(sample_data, log_dir):
+    """
+    Plotting function for the GenerativeSamples Callback
+    """
     fig, axes = plt.subplots(2, 5, sharey = True, figsize = (7.5, 3))
     fig.suptitle('sample generated image', fontsize = fontsize)
     idx = 0
@@ -72,6 +80,9 @@ def default_factory():
     return []
 
 def inf_gen_loss_plot(record, log_dir):
+    """
+    Plotting the network inference and generative losses
+    """
     fig, axes = plt.subplots(1, 2, sharey = False, figsize = (3,1.5), layout='constrained')
     fig.suptitle('Loss curves', fontsize = fontsize)
     axes[0].plot(torch.tensor(record.inf_loss), color = basal_color)
@@ -91,7 +102,7 @@ def inf_gen_loss_plot(record, log_dir):
 class InfGenLossRecord(Callback):
     def __init__(self) -> None:
         """
-        Callback that records network activation variables for a network during training
+        Callback that records inference and generative losses for a network during training and generates plots
         """
         super().__init__()
         self.record = SimRecord(default_factory)
@@ -113,6 +124,7 @@ class InfGenLossRecord(Callback):
         return
 
 def plasticity_quant_plot(total_apical_plasticity, total_apical_plasticity_sem, total_basal_plasticity, total_basal_plasticity_sem, apical_cossim, basal_cossim, log_dir):
+    """Plotting function for analyzing psychedelic-induced increases in plasticity"""
     if len(total_apical_plasticity) == 11:
         mixing_constant = torch.arange(0,1.1,0.1)
     else:
@@ -180,6 +192,7 @@ def plasticity_quant_plot(total_apical_plasticity, total_apical_plasticity_sem, 
     return
 
 def apical_basal_alignment_plot(record, log_dir):
+    """Plotting function for analyzing alignment between the apical and basal dendrites"""
     plt.figure()
     fig, axes = plt.subplots(1, 5, figsize = (7.5,1.5))
     basal = torch.vstack(record.basal).cpu()
@@ -242,24 +255,6 @@ class ApicalBasalAlignment(Callback):
         apical_basal_alignment_plot(self.record, log_dir)
         return
 
-def dynamic_mixed_samples_plot(sample_data, log_dir):
-    sample_data[torch.where(sample_data < 0)] = 0
-    sample_data[torch.where(sample_data > 1)] = 1
-    frame_size = tuple(sample_data.shape[-3:-1])
-    for ii in range(0,5):
-        for jj in range(0,11):
-            file_handle = 'Dynamic mixed samples alpha_' + str(jj) + ' image_' + str(ii) + '.mp4'
-            filename = str(log_dir / file_handle)
-            output = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), 60, frame_size)
-            T = sample_data.shape[2]
-
-            for tt in range(0,T):
-                im = ((sample_data[ii,jj,tt,...])*256).type(torch.uint8).numpy()
-                im = im[:,:,[2,1,0]]
-                output.write(im)
-            output.release()
-            cv2.destroyAllWindows()
-
 def fig2rgb_array(fig):
     fig.canvas.draw()
     buf = fig.canvas.tostring_rgb()
@@ -273,6 +268,7 @@ def figure_to_array(fig):
     return fig_array
 
 def dynamic_mixed_samples_pyplot(sample_data, log_dir):
+    """Function for storing a hallucination sequence as a video"""
     sample_data[torch.where(sample_data < 0)] = 0
     sample_data[torch.where(sample_data > 1)] = 1
     file_handle = 'Dynamic mixed samples image.mp4'
@@ -298,6 +294,7 @@ def dynamic_mixed_samples_pyplot(sample_data, log_dir):
     cv2.destroyAllWindows()
 
 def classifier_output_quant(mixed_samples, reference_data, y, network):
+    """Utility function for quantifying the classifier output accuracy and variability for hallucination data"""
     if torch.cuda.is_available():
         mixed_samples = mixed_samples.to(torch.cuda.current_device())
         reference_data = reference_data.to(torch.cuda.current_device())
@@ -316,6 +313,7 @@ def classifier_output_quant(mixed_samples, reference_data, y, network):
     return accuracy, variability, dist
 
 def classifier_output_plot(classifier_accuracy, classifier_variability, log_dir):
+    """Plotting function for the classifier accuracy"""
     mixing_constant = torch.arange(0,1.1,0.1)
     fig, axes = plt.subplots(1,1, figsize = (1.5,1.5))
     axes.scatter(mixing_constant, classifier_accuracy, color = apical_color)
@@ -346,6 +344,7 @@ def classifier_output_plot(classifier_accuracy, classifier_variability, log_dir)
 
 
 def dynamic_stim_cond_var(mixed_outputs, reference):
+    """Utility function for computing the change in stimulus-conditioned variability averaged over a batch of stimuli, for hallucinated network activity"""
     var = torch.var(mixed_outputs, dim = 0)
     ref_var = torch.var(reference, dim = 0)
     delta_var = torch.mean(var - ref_var)
@@ -353,6 +352,7 @@ def dynamic_stim_cond_var(mixed_outputs, reference):
     return delta_var, sem_var
 
 def dynamic_across_stim_var(mixed_outputs, inact_mixed_outputs):
+    """Utility function for computing the change in across-stimulus variability for hallucinated network activity"""
     var_ratio_eps = 1e-3
     var = torch.var(mixed_outputs[[-1],...], dim = (0,1))
     inact_var = torch.var(inact_mixed_outputs[[-1],...], dim = (0,1))
@@ -362,6 +362,7 @@ def dynamic_across_stim_var(mixed_outputs, inact_mixed_outputs):
     return mean_var_ratio, sem_var_ratio
 
 def dynamic_stim_cond_var_plot(mean_stimulus_conditioned_variance, sem_stimulus_conditioned_variance, log_dir, indicator = ""):
+    """Plotting function for quantifying stimulus-conditioned variability"""
     #generate plots
     fig, axes = plt.subplots(1,1,figsize = (1.5,1.5))
     plt.bar(torch.arange(0,12), mean_stimulus_conditioned_variance, yerr = sem_stimulus_conditioned_variance)
@@ -376,23 +377,8 @@ def dynamic_stim_cond_var_plot(mean_stimulus_conditioned_variance, sem_stimulus_
     plt.savefig(str(log_dir / path), format = 'pdf')
     return
 
-def classifier_dist_plot(classifier_dist, log_dir, indicator = ""):
-    #generate plots
-    fig, axes = plt.subplots(1,1,figsize = (1.5,1.5))
-    axes.scatter(torch.arange(0,13), classifier_dist)
-    plt.xticks(ticks = torch.arange(0,13), labels = [r"$\alpha$ = 0", r"$\alpha$ = 0.1", r"$\alpha$ = 0.2", r"$\alpha$ = 0.3", r"$\alpha$ = 0.4", r"$\alpha$ = 0.5", r"$\alpha$ = 0.6", r"$\alpha$ = 0.7", r"$\alpha$ = 0.8", r"$\alpha$ = 0.9", r"$\alpha$ = 1", "cov match", "var match"], rotation = 90, fontsize = fontsize)
-    plt.title("FID-like Dist. Comp.", fontsize = fontsize)
-    axes.spines.top.set_visible(False)
-    axes.spines.right.set_visible(False)
-    axes.tick_params(axis = 'both', which = 'major', labelsize=fontsize)
-    axes.tick_params(axis = 'both', which = 'minor', labelsize = fontsize)
-    plt.tight_layout()
-    path = "FID plot" + indicator + ".pdf"
-    plt.savefig(str(log_dir / path), format = 'pdf')
-    return
-
 def dynamic_across_stim_var_plot(mean_var_ratio, std_var_ratio, log_dir, indicator = ""):   
-    #generate plots
+    """Plotting function for quantifying across-stimulus variability"""
     fig, axes = plt.subplots(1,1,figsize = (1.5,1.5))
     plt.errorbar(torch.arange(0,11), mean_var_ratio, yerr = std_var_ratio)
     plt.plot(torch.arange(0,11), torch.ones(11), 'k')
@@ -408,6 +394,7 @@ def dynamic_across_stim_var_plot(mean_var_ratio, std_var_ratio, log_dir, indicat
     return
 
 def dynamic_image_plot(sample_data, log_dir, indicator = ""):
+    """Plotting function for stimulus-layer hallucination snapshots"""
     fig, axes = plt.subplots(6, 11, sharey = True, figsize = (7.5, 3))
     fig.suptitle('sample generated image', fontsize = fontsize)
     idx = 0
@@ -432,10 +419,12 @@ def dynamic_image_plot(sample_data, log_dir, indicator = ""):
     return
 
 def dynamic_corr_calc(activity):
+    """Utility function for computing within-layer correlations"""
     flat_activity = activity
     return torch.corrcoef(flat_activity.T)
 
 def dynamic_corr_comparisons_plot(corr_list, log_dir, indicator = ""):
+    """Plotting function for comparing correlation matrices across different hallucination levels"""
     mixing_constant = np.arange(0,1,0.2)
     fig, axes = plt.subplots(1, 11, sharey = True, sharex = True, figsize = (15,1.5))
     fig_2, axes_2 = plt.subplots(1, 11, sharey = True, sharex = True, figsize = (15,1.5))
@@ -478,6 +467,7 @@ def dynamic_corr_comparisons_plot(corr_list, log_dir, indicator = ""):
     return
 
 def cosine_similarity(vec_1, vec_2):
+    """Utility function for computing cosine similarity"""
     norm_1 = vec_1.flatten()
     norm_1 = norm_1/torch.linalg.norm(norm_1)
     norm_2 = vec_2.flatten()
@@ -486,11 +476,13 @@ def cosine_similarity(vec_1, vec_2):
     return torch.dot(norm_1, norm_2)
 
 def explained_var_calc(data, n_components):
+    """Utility function for computing the proportion explained variance of different principal components"""
     pca = PCA(n_components=n_components)
     pca.fit(data.flatten(start_dim = 1))
     return pca.explained_variance_ratio_
 
 def explained_var_plot(explained_var, log_dir):
+    """Plotting function for the proportion explained variance for different principal components across different hallucination levels"""
     fig, ax = plt.subplots(1,1, figsize = (3, 3))
     ax.plot(explained_var[0,:])
     ax.plot(explained_var[5,:])
@@ -504,7 +496,7 @@ def explained_var_plot(explained_var, log_dir):
 class DynamicMixedSampler(Callback):
     def __init__(self) -> None:
         """
-        Callback that records network activation variables for a network during training
+        The primary callback for generating and analyzing hallucinatory activity in trained networks
         """
         super().__init__()
         self.record = SimRecord(default_factory)
@@ -517,6 +509,7 @@ class DynamicMixedSampler(Callback):
         return
     
     def on_test_end(self, trainer: Trainer, pl_module: Algorithm) -> None:
+        """Run on a fully trained network at the end of training"""
         with torch.inference_mode(False),torch.set_grad_enabled(True):
             if trainer is not None:
                 # Use the Trainer's log dir if we have a trainer. (NOTE: we should always have one,
@@ -524,10 +517,11 @@ class DynamicMixedSampler(Callback):
                 log_dir = Path(trainer.log_dir or log_dir)
             
             mixing_constant = np.arange(0,1.1,0.1)
-            T = 800
-            plasticity_eps = 1e-2
+            T = 800 #number of simulation timesteps
+            plasticity_eps = 1e-2 #constant to prevent numerical instability in plasticity calculations
             sample_data = torch.zeros(6,11,T, *pl_module.x[0,...].permute(1,2,0).shape)
             
+            #Initialize all storage variables
             x = pl_module.x
             y = pl_module.y
             timescale = 0.1
@@ -552,9 +546,9 @@ class DynamicMixedSampler(Callback):
             classifier_dist = torch.zeros(13)
 
 
-            l4_N = np.prod(pl_module.network.ts[1].output.shape[1::]) 
+            corr_N = np.prod(pl_module.network.ts[1].output.shape[1::]) 
 
-            corr = torch.zeros(11,l4_N, l4_N)
+            corr = torch.zeros(11,corr_N, corr_N)
             pc_num = 20
             explained_var = torch.zeros(11, pc_num)
 
@@ -581,11 +575,13 @@ class DynamicMixedSampler(Callback):
                 x_closed_eyes = multiplier*torch.ones(pl_module.x.shape, device = torch.cuda.current_device())
             else:
                 x_closed_eyes = multiplier*torch.ones(pl_module.x.shape)
-            for jj in range(0,11):
+
+            for jj in range(0,11): # loop through hallucination magnitudes
                 data = x 
+                #Store network activity for layers 0 and 1 while under hallucinatory dynamics
                 data = pl_module.network.dynamic_mixed_forward(data, T, mixing_constant = 1-mixing_constant[jj], timescale = timescale, idxs = [0,1], mode = pl_module.hallucination_mode)
 
-
+                #Generate plasticity based on hallucinatory network activity
                 gen_opt.zero_grad()
                 total_likelihood_gen_rm = - pl_module.network.gen_log_prob(mixed_output = True)
                 pre_grad_gen = torch.mean(total_likelihood_gen_rm)
@@ -597,6 +593,8 @@ class DynamicMixedSampler(Callback):
                 if jj == 0:
                     baseline_grad_list_gen = []
                 ctr = 0
+
+                #Quantify plasticity based on hallucinatory network activity
                 for param in pl_module.network.gen_group.parameters():
                     if not(param.grad is None):
                         if jj == 0:
@@ -641,8 +639,10 @@ class DynamicMixedSampler(Callback):
 
                 im_data = data[0].cpu().permute(1,0,3,4,2)
                 lesion_idx = 0
+                #generate inactivation data (inactivate highest network layer)
                 data_inactivation = pl_module.network.dynamic_mixed_forward(x, T, mixing_constant = 1-mixing_constant[jj], timescale = timescale, idxs = [0], lesion_idxs = [lesion_idx], mode = pl_module.hallucination_mode)
 
+                #generate apical inactivation data (cut off apical inputs to the stimulus layer)
                 apical_lesion_idx = len(pl_module.network.gen_ts) - 1
                 data_apical_inactivation = pl_module.network.dynamic_mixed_forward(x, T, mixing_constant = 1-mixing_constant[jj], timescale = timescale, idxs = [0], apical_lesion_idxs = [apical_lesion_idx], mode = pl_module.hallucination_mode)
                 im_data_inactivation = data_inactivation[0].cpu().permute(1,0,3,4,2)
@@ -675,7 +675,7 @@ class DynamicMixedSampler(Callback):
                 sample_data = (sample_data + 1)/2 #now mnist data lies between 0 and 1
                 sample_data = sample_data.repeat(1,1,1,1,1,3) #convert [28,28,1] shape to [28,28,3] shape
         
-
+        #generate plots based on analyzed data
         dynamic_stim_cond_var_plot(mean_stimulus_conditioned_variance, std_stimulus_conditioned_variance, log_dir)
 
         plasticity_quant_plot(total_apical_plasticity, total_apical_plasticity_sem, total_basal_plasticity, total_basal_plasticity_sem, apical_cosine_sim, basal_cosine_sim, log_dir)
@@ -686,18 +686,9 @@ class DynamicMixedSampler(Callback):
         dynamic_across_stim_var_plot(mean_var_ratio_apical, sem_var_ratio_apical, log_dir, indicator = " apical inact")
 
         classifier_output_plot(classifier_accuracy, classifier_variability, log_dir)
-        ref_mean = torch.mean(class_data_ref.flatten(end_dim = 1).permute(1,0), dim = 1)
-        ref_cov = torch.cov(class_data_ref.flatten(end_dim = 1).permute(1,0))
-        cov_matched_dist = MultivariateNormal(loc = ref_mean, covariance_matrix = ref_cov)
-        cov_matched_data = cov_matched_dist.sample(sample_shape = torch.Size([class_data_ref.shape[0], class_data_ref.shape[1]]))
-        _, _, classifier_dist[-2] = classifier_output_quant(cov_matched_data.detach(), class_data_ref, y, pl_module.network)
         
-        var_matched_dist = MultivariateNormal(loc = ref_mean, covariance_matrix = torch.diag(torch.diag(ref_cov)))
-        var_matched_data = var_matched_dist.sample(sample_shape = torch.Size([class_data_ref.shape[0], class_data_ref.shape[1]]))
-        _, _, classifier_dist[-1] = classifier_output_quant(var_matched_data, class_data_ref, y, pl_module.network)
-        classifier_dist_plot(classifier_dist, log_dir)
         dynamic_image_plot(sample_data[:,:,-1,...].permute(0,1,4,2,3), log_dir, indicator = "mixed")
         dynamic_image_plot(sample_data_closed_eyes.permute(0,1,4,2,3), log_dir, indicator = "closed_eyes")
         dynamic_corr_comparisons_plot(corr, log_dir, indicator = "dynamic_")
-        dynamic_mixed_samples_pyplot(sample_data[:,:,0:500,...], log_dir)
+        dynamic_mixed_samples_pyplot(sample_data[:,:,0:500,...], log_dir) #video functionality. Runtime can be significantly reduced by commenting out this line
         return

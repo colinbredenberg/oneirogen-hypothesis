@@ -54,11 +54,22 @@ python main.py algorithm=backprop datamodule=mnist trainer.max_epochs=10
 
 ## Running experiments
 
-To rerun the experiments used to produce the main paper figures, choose an experiment in the ```beyond_backprop/configs/experiment``` folder and run:
+To rerun the experiments used to produce the main paper figures, choose an experiment in the ```beyond_backprop/configs/experiment``` folder and from the oneirogen-hypothesis folder run:
 
 ```console
 python main.py experiment=[experiment_name]
 ```
+
+experiment_name options: 
+
+Multicompartment model trained on MNIST (main results): ```rm_wake_sleep_ff```
+Multicompartment model trained on CIFAR10: ```rm_wake_sleep_ff_cifar```
+No learning control: ```rm_wake_sleep_ff_no_learning```
+Single compartment model: ```rm_wake_sleep_ff_no_batch_norm```
+Noise-based hallucination protocol: ```rm_wake_sleep_ff_noise```
+Recurrent network model: ```rm_wake_sleep``` (note: this model is much larger and takes longer to run)
+
+
 
 Expected runtime: 2-3 hours. Generating full hallucination videos may take longer, but experiment results will appear in your ```beyond_backprop/logs/``` folder before then.
 

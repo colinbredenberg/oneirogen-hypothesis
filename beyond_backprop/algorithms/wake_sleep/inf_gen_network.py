@@ -144,9 +144,9 @@ class InfGenNetwork(nn.Module):
                     if layer.input_layer: #child nodes receive the inputs to the network
                         input_list += [*x]
                     if count in apical_lesion_idxs:
-                        layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, geometric_mean = False, apical_lesion = True, mode = mode)
+                        layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, apical_lesion = True, mode = mode)
                     else:
-                        layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, geometric_mean = False, apical_lesion = False, mode = mode)
+                        layer.dynamic_mixed_forward(input_list, input_list_gen, mixing_constant, timescale, apical_lesion = False, mode = mode)
                     if count in lesion_idxs:
                         if torch.cuda.is_available():
                             layer.dynamic_mixed_output = torch.zeros(layer.dynamic_mixed_output.shape).to(torch.cuda.current_device())

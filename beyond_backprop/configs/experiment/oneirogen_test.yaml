@@ -7,7 +7,7 @@ defaults:
   - override /datamodule: mnist
   - override /algorithm: rm_wake_sleep
   - override /network: fcwsmodel
-  - override /trainer: cpu
+  - override /trainer: default
   - override /trainer/callbacks: no_checkpoints
 
 # all parameters below will be merged with parameters from default configurations set above
